@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AnimeTogether - Admin Panel</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+    }
+
+    .stats {
+      display: flex;
+      gap: 30px;
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #00d4ff;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #888;
+      margin-top: 5px;
+      text-transform: uppercase;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      background: #00d4ff;
+      color: #1a1a2e;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      background: #00a8cc;
+      transform: translateY(-2px);
+    }
+
+    button:disabled {
+      background: #666;
+      color: #999;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .rooms-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+      gap: 20px;
+    }
+
+    .room-card {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .room-card:hover {
+      border-color: rgba(0, 212, 255, 0.5);
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+    }
+
+    .room-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .room-id {
+      font-size: 14px;
+      color: #888;
+      font-family: monospace;
+      word-break: break-all;
+    }
+
+    .room-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #00d4ff;
+    }
+
+    .user-count {
+      background: rgba(0, 212, 255, 0.2);
+      color: #00d4ff;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .video-info {
+      margin-bottom: 15px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+    }
+
+    .video-title {
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 5px;
+    }
+
+    .video-meta {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .users-section {
+      margin-bottom: 15px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .user-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .user-item:last-child {
+      border-bottom: none;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00d4ff, #0099cc);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: #1a1a2e;
+    }
+
+    .user-name {
+      font-size: 14px;
+    }
+
+    .user-badge {
+      background: #ff6b6b;
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .user-badge.host {
+      background: #4ecdc4;
+    }
+
+    .takeover-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      background: #ff6b6b;
+      color: #fff;
+    }
+
+    .takeover-btn:hover {
+      background: #ff5252;
+    }
+
+    .playback-state {
+      display: flex;
+      gap: 20px;
+      font-size: 12px;
+      color: #888;
+    }
+
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ecdc4;
+      margin-right: 8px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .error {
+      background: rgba(255, 107, 107, 0.2);
+      border: 1px solid #ff6b6b;
+      color: #ff9999;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+
+    .success {
+      background: rgba(78, 205, 196, 0.2);
+      border: 1px solid #4ecdc4;
+      color: #7df3e7;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>🎬 AnimeTogether Admin Panel</h1>
+        <p style="color: #888; margin-top: 5px; font-size: 13px;">Monitor and manage active watch rooms</p>
+      </div>
+      <div class="controls">
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-value" id="total-rooms">0</div>
+            <div class="stat-label">Active Rooms</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="total-users">0</div>
+            <div class="stat-label">Total Users</div>
+          </div>
+        </div>
+        <button id="refresh-btn" style="width: auto;">🔄 Refresh</button>
+      </div>
+    </header>
+
+    <div id="message-container"></div>
+
+    <div id="rooms-container" class="loading">
+      <p>Loading rooms...</p>
+    </div>
+  </div>
+
+  <script>
+    let refreshInterval;
+
+    async function loadRooms() {
+      try {
+        const response = await fetch('/api/admin/rooms');
+        const data = await response.json();
+
+        if (!data.success) {
+          showError('Failed to load rooms');
+          return;
+        }
+
+        displayRooms(data.rooms);
+        document.getElementById('total-rooms').textContent = data.totalRooms;
+        document.getElementById('total-users').textContent = data.totalUsers;
+      } catch (error) {
+        console.error('Error loading rooms:', error);
+        showError('Error loading rooms: ' + error.message);
+      }
+    }
+
+    function displayRooms(rooms) {
+      const container = document.getElementById('rooms-container');
+
+      if (rooms.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No active rooms</p></div>';
+        return;
+      }
+
+      container.innerHTML = '<div class="rooms-grid">' + rooms.map(room => createRoomCard(room)).join('') + '</div>';
+
+      // Attach event listeners to takeover buttons
+      document.querySelectorAll('.takeover-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const channelId = e.target.dataset.channelId;
+          const userId = e.target.dataset.userId;
+          changeHost(channelId, userId);
+        });
+      });
+    }
+
+    function createRoomCard(room) {
+      const videoInfo = room.currentVideo
+        ? `
+        <div class="video-info">
+          <div class="video-title">${escapeHtml(room.currentVideo.title || 'Unknown')}</div>
+          <div class="video-meta">
+            Episode: ${room.currentVideo.episode || 'N/A'}
+            ${room.currentVideo.isDub ? '• Dub' : ''}
+          </div>
+        </div>
+      `
+        : '<div class="video-info"><div class="video-meta">No video loaded</div></div>';
+
+      const playbackInfo = room.playbackState
+        ? `
+        <div class="playback-state">
+          <span>${room.playbackState.playing ? '▶️ Playing' : '⏸️ Paused'}</span>
+          <span>${formatTime(room.playbackState.currentTime)}</span>
+        </div>
+      `
+        : '';
+
+      const usersHtml = room.viewers.map(user => {
+        const isCurrentUser = user.userId === room.hostId;
+        return `
+        <div class="user-item">
+          <div class="user-info">
+            <div class="user-avatar">${user.username.charAt(0).toUpperCase()}</div>
+            <div class="user-name">${escapeHtml(user.username)}</div>
+          </div>
+          ${isCurrentUser ? '<span class="user-badge host">Host</span>' : `<button class="takeover-btn" data-channel-id="${room.channelId}" data-user-id="${user.userId}">Take Over</button>`}
+        </div>
+      `;
+      }).join('');
+
+      // Add host to users list
+      const hostUser = room.viewers.find(u => u.userId === room.hostId);
+      const hostHtml = !hostUser
+        ? `
+        <div class="user-item">
+          <div class="user-info">
+            <div class="user-avatar">H</div>
+            <div class="user-name">User ${room.hostId.substring(0, 8)}</div>
+          </div>
+          <span class="user-badge host">Host</span>
+        </div>
+      `
+        : '';
+
+      return `
+      <div class="room-card">
+        <div class="room-header">
+          <div>
+            <div class="room-title"><span class="status-indicator"></span>Room</div>
+            <div class="room-id">Channel: ${escapeHtml(room.channelId)}</div>
+          </div>
+          <div class="user-count">${room.totalUsers} ${room.totalUsers === 1 ? 'user' : 'users'}</div>
+        </div>
+
+        ${videoInfo}
+
+        <div class="users-section">
+          <div class="section-title">👥 Participants</div>
+          ${hostHtml}
+          ${usersHtml}
+        </div>
+
+        ${playbackInfo}
+      </div>
+    `;
+    }
+
+    async function changeHost(channelId, newHostId) {
+      if (!confirm(`Change host to ${newHostId.substring(0, 8)}?`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/rooms/${encodeURIComponent(channelId)}/change-host`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newHostId }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showSuccess(`Host changed successfully`);
+          loadRooms();
+        } else {
+          showError(data.error || 'Failed to change host');
+        }
+      } catch (error) {
+        console.error('Error changing host:', error);
+        showError('Error: ' + error.message);
+      }
+    }
+
+    function showError(message) {
+      const container = document.getElementById('message-container');
+      container.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
+      setTimeout(() => {
+        container.innerHTML = '';
+      }, 5000);
+    }
+
+    function showSuccess(message) {
+      const container = document.getElementById('message-container');
+      container.innerHTML = `<div class="success">${escapeHtml(message)}</div>`;
+      setTimeout(() => {
+        container.innerHTML = '';
+      }, 3000);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatTime(seconds) {
+      if (!seconds) return '0:00';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // Initial load and auto-refresh
+    document.getElementById('refresh-btn').addEventListener('click', loadRooms);
+    loadRooms();
+    refreshInterval = setInterval(loadRooms, 3000);
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+    });
+  </script>
+</body>
+</html>
