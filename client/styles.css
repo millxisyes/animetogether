@@ -1558,3 +1558,9 @@ video::cue {
   gap: 6px;
   font-weight: 500;
 }
+
+.speed-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}

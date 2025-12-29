@@ -48,6 +48,60 @@ export async function loadTopAiring() {
     }
 }
 
+export function loadWatchHistory() {
+    elements.animeResults.innerHTML = '';
+    showSearchResults();
+
+    try {
+        const history = JSON.parse(localStorage.getItem('watchHistory') || '[]');
+        if (history.length === 0) {
+            elements.animeResults.innerHTML = '<p class="placeholder-text">No watch history yet.</p>';
+            return;
+        }
+
+        history.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'anime-card';
+
+            const img = document.createElement('img');
+            img.src = proxyImage(item.thumbnail);
+            img.alt = item.title;
+            img.onerror = () => { img.src = ''; };
+
+            const info = document.createElement('div');
+            info.className = 'anime-card-info';
+
+            const title = document.createElement('div');
+            title.className = 'anime-card-title';
+            title.textContent = item.title;
+
+            const meta = document.createElement('div');
+            meta.className = 'anime-card-meta';
+            const progress = item.duration ? Math.round((item.currentTime / item.duration) * 100) : 0;
+            meta.innerHTML = `Ep ${item.episode} <span style="opacity:0.7">• ${progress}%</span>`;
+
+            info.appendChild(title);
+            info.appendChild(meta);
+            card.appendChild(img);
+            card.appendChild(info);
+
+            card.addEventListener('click', () => {
+                // To resume, we need to play the episode. 
+                // We should probably seek to currentTime after load, but playEpisode doesn't take start time.
+                // It's okay, user can seek. Or we can improve playEpisode later.
+                // Actually, if we play, history will update.
+                playEpisode(item.id, item.title, item.episode, item.thumbnail);
+            });
+
+            elements.animeResults.appendChild(card);
+        });
+
+    } catch (e) {
+        console.error('Failed to load history:', e);
+        elements.animeResults.innerHTML = '<p class="placeholder-text">Failed to load history.</p>';
+    }
+}
+
 export function displayAnimeResults(results) {
     if (results.length === 0) {
         elements.animeResults.innerHTML = '<p class="placeholder-text">No results found</p>';

@@ -3,7 +3,8 @@ import {
     searchAnime,
     loadRecentEpisodes,
     loadTopAiring,
-    showSearchResults
+    showSearchResults,
+    loadWatchHistory
 } from './catalog.js';
 import {
     togglePlayPause,
@@ -11,7 +12,8 @@ import {
     updateVolumeIcon,
     updateProgress,
     updateTimeDisplay,
-    skipIntro
+    skipIntro,
+    setPlaybackRate
 } from './player.js';
 import { sendWsMessage } from './socket.js';
 import { captionSettings } from './captionSettings.js';
@@ -62,6 +64,8 @@ export const elements = {
     dubLabel: document.getElementById('dub-label'),
     skipIntroBtn: document.getElementById('skip-intro-btn'),
     hianimeWarning: document.getElementById('hianime-warning'),
+    speedBtn: document.getElementById('speed-btn'),
+    speedMenu: document.getElementById('speed-menu'),
 };
 
 export function showMainScreen() {
@@ -274,6 +278,7 @@ export function setupEventListeners() {
             const view = btn.dataset.view;
             if (view === 'recent') loadRecentEpisodes();
             else if (view === 'top') loadTopAiring();
+            else if (view === 'history') loadWatchHistory();
             else showSearchResults();
         });
     });
@@ -409,6 +414,7 @@ export function setupEventListeners() {
                 type: 'sync',
                 playing: !elements.videoPlayer.paused,
                 currentTime: elements.videoPlayer.currentTime,
+                playbackRate: elements.videoPlayer.playbackRate,
                 episodeId: state.currentVideo.episodeId,
             });
         }
@@ -438,6 +444,35 @@ export function setupEventListeners() {
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    // Speed Control
+    if (elements.speedBtn) {
+        elements.speedBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            elements.speedMenu.classList.toggle('hidden');
+            if (elements.captionMenu) elements.captionMenu.classList.add('hidden');
+        });
+    }
+
+    document.querySelectorAll('#speed-menu .caption-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const speed = parseFloat(btn.dataset.speed);
+            setPlaybackRate(speed);
+
+            // Update UI
+            document.querySelectorAll('#speed-menu .caption-option').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            elements.speedBtn.textContent = `${speed}x`;
+            elements.speedMenu.classList.add('hidden');
+        });
+    });
+
+    // Close speed menu on click outside
+    document.addEventListener('click', (e) => {
+        if (elements.speedMenu && !elements.speedMenu.contains(e.target) && e.target !== elements.speedBtn) {
+            elements.speedMenu.classList.add('hidden');
+        }
+    });
 
     // Initialize Caption Settings
     captionSettings.load();

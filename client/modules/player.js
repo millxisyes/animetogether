@@ -233,6 +233,14 @@ export function loadVideo(video, playbackState) {
     const episode = video.episode || '?';
     elements.nowPlaying.textContent = `${title} - Ep ${episode}`;
     elements.progressFill.style.width = '0%';
+    elements.videoPlayer.playbackRate = 1; // Reset speed
+    // Reset UI speed button
+    if (elements.speedBtn) elements.speedBtn.textContent = '1x';
+    document.querySelectorAll('#speed-menu .caption-option').forEach(b => {
+        b.classList.remove('active');
+        if (b.dataset.speed === '1') b.classList.add('active');
+    });
+
     updateTimeDisplay();
 
     if (state.hls) {
@@ -436,6 +444,14 @@ export function updateProgress() {
     }
 
     updateTimeDisplay();
+
+    // Save history
+    if (state.isHost) saveToHistory();
+    // Start saving for everyone? Or just host? 
+    // Usually local history is local. Video plays for everyone.
+    // Let's save for everyone if they are watching.
+    // Actually limit it to whenever progress updates.
+    saveToHistory();
 }
 
 export function updateTimeDisplay() {
@@ -443,6 +459,42 @@ export function updateTimeDisplay() {
     const current = formatTime(video.currentTime);
     const duration = formatTime(video.duration);
     elements.timeDisplay.textContent = `${current} / ${duration}`;
+}
+
+// History Throttle
+let lastHistorySave = 0;
+function saveToHistory() {
+    if (!state.currentVideo || !state.currentVideo.episodeId) return;
+
+    const now = Date.now();
+    if (now - lastHistorySave < 5000) return; // Throttle 5s
+    lastHistorySave = now;
+
+    try {
+        const history = JSON.parse(localStorage.getItem('watchHistory') || '[]');
+        const newItem = {
+            id: state.currentVideo.episodeId, // distinct by episode
+            animeId: state.currentVideo.episodeId.split('$')[0], // ballpark anime id
+            title: state.currentVideo.title,
+            episode: state.currentVideo.episode,
+            thumbnail: state.currentVideo.thumbnail || null,
+            currentTime: elements.videoPlayer.currentTime,
+            duration: elements.videoPlayer.duration,
+            timestamp: now,
+            provider: state.provider
+        };
+
+        // Remove existing entry for this specific episode
+        const filtered = history.filter(h => h.id !== newItem.id);
+        // Add new at top
+        filtered.unshift(newItem);
+        // Keep max 50
+        const trimmed = filtered.slice(0, 50);
+
+        localStorage.setItem('watchHistory', JSON.stringify(trimmed));
+    } catch (e) {
+        console.error('Failed to save history:', e);
+    }
 }
 
 export function syncPlaybackForLateJoiner(playbackState) {
@@ -511,6 +563,11 @@ export function handleSync(message) {
         updatePlayPauseIcon(false);
         updateDiscordActivityState(false);
     }
+
+    if (message.playbackRate && video.playbackRate !== message.playbackRate) {
+        video.playbackRate = message.playbackRate;
+        if (elements.speedBtn) elements.speedBtn.textContent = `${message.playbackRate}x`;
+    }
 }
 
 export function handleRemotePlay() {
@@ -537,6 +594,18 @@ export function skipIntro() {
     elements.videoPlayer.currentTime = newTime;
     sendWsMessage({ type: 'seek', currentTime: newTime });
     addChatMessage({ system: true, content: 'Skipped 85s (Intro)' });
+}
+
+export function setPlaybackRate(rate) {
+    if (elements.videoPlayer) {
+        elements.videoPlayer.playbackRate = rate;
+        if (state.isHost) {
+            // Host syncs this via the regular sync interval (every 2s)
+            // But we can force a sync push if we want instant update, or just wait.
+            // Let's rely on the interval.
+            addChatMessage({ system: true, content: `Host set playback speed to ${rate}x` });
+        }
+    }
 }
 
 async function handleVideoEnded() {
