@@ -146,6 +146,65 @@ export function showSearchResults() {
     elements.animeResults.classList.remove('hidden');
 }
 
+// Helper to get watch history for an anime
+function getAnimeHistory(animeId) {
+    try {
+        const history = JSON.parse(localStorage.getItem('watchHistory') || '[]');
+        return history.filter(h => h.animeId === animeId);
+    } catch { return []; }
+}
+
+// Helper to check if watched
+function isEpisodeWatched(episodeId) {
+    try {
+        const history = JSON.parse(localStorage.getItem('watchHistory') || '[]');
+        return history.some(h => h.id === episodeId); // approximate check
+    } catch { return false; }
+}
+
+// Watch Later Logic
+function getWatchLater() {
+    try {
+        return JSON.parse(localStorage.getItem('watchLater') || '[]');
+    } catch { return []; }
+}
+
+function addToWatchLater(anime) {
+    const list = getWatchLater();
+    if (!list.some(a => a.id === anime.id)) {
+        list.unshift({
+            id: anime.id,
+            title: anime.title,
+            image: anime.image,
+            addedAt: Date.now()
+        });
+        localStorage.setItem('watchLater', JSON.stringify(list));
+    }
+}
+
+function removeFromWatchLater(animeId) {
+    const list = getWatchLater();
+    const newList = list.filter(a => a.id !== animeId);
+    localStorage.setItem('watchLater', JSON.stringify(newList));
+}
+
+function isInWatchLater(animeId) {
+    return getWatchLater().some(a => a.id === animeId);
+}
+
+export function loadWatchLater() {
+    elements.animeResults.innerHTML = '';
+    showSearchResults();
+
+    const list = getWatchLater();
+    if (list.length === 0) {
+        elements.animeResults.innerHTML = '<p class="placeholder-text">Your Watch Later list is empty.</p>';
+        return;
+    }
+
+    displayAnimeResults(list);
+}
+
 export async function loadAnimeDetails(animeId) {
     elements.animeResults.classList.add('hidden');
     elements.animeDetails.classList.remove('hidden');
@@ -170,6 +229,23 @@ export async function loadAnimeDetails(animeId) {
         const titleEl = document.createElement('h3');
         titleEl.textContent = anime.title || 'Unknown title';
 
+        // Watch Later Button
+        const wlBtn = document.createElement('button');
+        wlBtn.className = 'mini-btn text-btn';
+        wlBtn.style.marginTop = '8px';
+        const inList = isInWatchLater(anime.id);
+        wlBtn.textContent = inList ? 'Remove from Watch Later' : 'Add to Watch Later';
+        wlBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (isInWatchLater(anime.id)) {
+                removeFromWatchLater(anime.id);
+                wlBtn.textContent = 'Add to Watch Later';
+            } else {
+                addToWatchLater(anime);
+                wlBtn.textContent = 'Remove from Watch Later';
+            }
+        };
+
         const descEl = document.createElement('p');
         const safeDescription = anime.description ? anime.description.toString() : '';
         descEl.textContent = safeDescription.length > 200
@@ -178,6 +254,7 @@ export async function loadAnimeDetails(animeId) {
 
         infoWrapper.appendChild(titleEl);
         infoWrapper.appendChild(descEl);
+        infoWrapper.appendChild(wlBtn);
         detailHeader.appendChild(cover);
         detailHeader.appendChild(infoWrapper);
 
@@ -191,6 +268,21 @@ export async function loadAnimeDetails(animeId) {
             anime.episodes.forEach(ep => {
                 const item = document.createElement('div');
                 item.className = 'episode-item';
+                if (state.currentVideo && state.currentVideo.episodeId === ep.id) {
+                    item.classList.add('playing');
+                }
+                // Visual Progress
+                if (isEpisodeWatched(ep.id)) {
+                    item.classList.add('watched');
+                    // item.style.opacity = '0.6'; // Optional: fade watched?
+                    // Or add checkmark
+                    const check = document.createElement('span');
+                    check.textContent = '✓ ';
+                    check.style.color = 'var(--accent)';
+                    check.style.marginRight = '4px';
+                    item.prepend(check);
+                }
+
                 item.dataset.id = ep.id || '';
                 item.dataset.title = anime.title || '';
                 item.dataset.episode = ep.number || '';

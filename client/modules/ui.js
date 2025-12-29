@@ -4,7 +4,8 @@ import {
     loadRecentEpisodes,
     loadTopAiring,
     showSearchResults,
-    loadWatchHistory
+    loadWatchHistory,
+    loadWatchLater
 } from './catalog.js';
 import {
     togglePlayPause,
@@ -13,7 +14,9 @@ import {
     updateProgress,
     updateTimeDisplay,
     skipIntro,
-    setPlaybackRate
+    setPlaybackRate,
+    playNext,
+    playPrevious
 } from './player.js';
 import { sendWsMessage } from './socket.js';
 import { captionSettings } from './captionSettings.js';
@@ -66,6 +69,8 @@ export const elements = {
     hianimeWarning: document.getElementById('hianime-warning'),
     speedBtn: document.getElementById('speed-btn'),
     speedMenu: document.getElementById('speed-menu'),
+    nextBtn: document.getElementById('next-btn'),
+    prevBtn: document.getElementById('prev-btn'),
 };
 
 export function showMainScreen() {
@@ -279,6 +284,7 @@ export function setupEventListeners() {
             if (view === 'recent') loadRecentEpisodes();
             else if (view === 'top') loadTopAiring();
             else if (view === 'history') loadWatchHistory();
+            else if (view === 'watch-later') loadWatchLater();
             else showSearchResults();
         });
     });
@@ -445,7 +451,6 @@ export function setupEventListeners() {
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
-    // Speed Control
     if (elements.speedBtn) {
         elements.speedBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -453,6 +458,9 @@ export function setupEventListeners() {
             if (elements.captionMenu) elements.captionMenu.classList.add('hidden');
         });
     }
+
+    if (elements.nextBtn) elements.nextBtn.addEventListener('click', playNext);
+    if (elements.prevBtn) elements.prevBtn.addEventListener('click', playPrevious);
 
     document.querySelectorAll('#speed-menu .caption-option').forEach(btn => {
         btn.addEventListener('click', () => {

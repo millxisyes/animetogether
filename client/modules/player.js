@@ -608,6 +608,30 @@ export function setPlaybackRate(rate) {
     }
 }
 
+
+export async function playNext() {
+    if (!state.currentVideo || !state.episodeList) return;
+
+    const currentIndex = state.episodeList.findIndex(ep => ep.id === state.currentVideo.episodeId);
+    if (currentIndex === -1 || currentIndex >= state.episodeList.length - 1) return;
+
+    const nextEp = state.episodeList[currentIndex + 1];
+
+    // Use current video thumbnail as best guess if not available
+    await playEpisode(nextEp.id, state.currentVideo.title, nextEp.number, state.currentVideo.thumbnail);
+}
+
+export async function playPrevious() {
+    if (!state.currentVideo || !state.episodeList) return;
+
+    const currentIndex = state.episodeList.findIndex(ep => ep.id === state.currentVideo.episodeId);
+    if (currentIndex <= 0) return;
+
+    const prevEp = state.episodeList[currentIndex - 1];
+
+    await playEpisode(prevEp.id, state.currentVideo.title, prevEp.number, state.currentVideo.thumbnail);
+}
+
 async function handleVideoEnded() {
     if (!state.isHost) return;
     console.log('Video ended. checking for next episode...');
