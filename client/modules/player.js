@@ -5,6 +5,7 @@ import { formatTime } from './utils.js';
 import { sendWsMessage } from './socket.js';
 import { updateDiscordActivity } from './auth.js';
 import { featureFlags } from './flags.js';
+import { proxyImage } from './utils.js'; // Needed for next episode thumbnail
 
 export async function fetchAndLoadVideoForViewer(videoInfo, playbackState) {
     console.log('Viewer: fetching fresh stream for episode', videoInfo.episodeId);
@@ -26,6 +27,13 @@ export async function fetchAndLoadVideoForViewer(videoInfo, playbackState) {
         }
         const data = await response.json();
 
+        // Show/Hide HiAnime Warning
+        if (data.serverUsed === 'hianime-fallback') {
+            elements.hianimeWarning.classList.remove('hidden');
+        } else {
+            elements.hianimeWarning.classList.add('hidden');
+        }
+
         if (data.sources && data.sources.length > 0) {
             const priorityOrder = ['default', 'auto', '1080p', '720p', '480p'];
             const sortedSources = [...data.sources].sort((a, b) => {
@@ -44,7 +52,9 @@ export async function fetchAndLoadVideoForViewer(videoInfo, playbackState) {
             };
 
             if (!videoInfo.isDub && data.subtitles && data.subtitles.length > 0) {
-                const engSub = data.subtitles.find(s => s.lang === 'English') || data.subtitles[0];
+                // Robust English detection
+                const findEnglish = (subs) => subs.find(s => s.lang?.toLowerCase().includes('english') || s.lang?.toLowerCase() === 'en' || s.lang?.toLowerCase() === 'eng');
+                const engSub = findEnglish(data.subtitles) || data.subtitles[0];
                 if (engSub) {
                     freshVideoData.subtitle = engSub.proxyUrl; // Use signed subtitle URL
                 }
@@ -115,6 +125,13 @@ export async function playEpisode(episodeId, title, episode, thumbnail) {
         }
         const data = await response.json();
 
+        // Show/Hide HiAnime Warning
+        if (data.serverUsed === 'hianime-fallback') {
+            elements.hianimeWarning.classList.remove('hidden');
+        } else {
+            elements.hianimeWarning.classList.add('hidden');
+        }
+
         if (data.sources && data.sources.length > 0) {
             const allSources = data.sources;
             let workingSource = null;
@@ -162,7 +179,9 @@ export async function playEpisode(episodeId, title, episode, thumbnail) {
             };
 
             if (!state.isDub && allSubtitles.length > 0) {
-                const engSub = allSubtitles.find(s => s.lang === 'English') || allSubtitles[0];
+                // Robust English detection
+                const findEnglish = (subs) => subs.find(s => s.lang?.toLowerCase().includes('english') || s.lang?.toLowerCase() === 'en' || s.lang?.toLowerCase() === 'eng');
+                const engSub = findEnglish(allSubtitles) || allSubtitles[0];
                 if (engSub) {
                     videoData.subtitle = engSub.proxyUrl;
                 }
@@ -248,6 +267,10 @@ export function loadVideo(video, playbackState) {
             }
         });
     }
+
+    // Auto-Next Listener
+    videoElement.removeEventListener('ended', handleVideoEnded);
+    videoElement.addEventListener('ended', handleVideoEnded);
 
     addChatMessage({ system: true, content: `Now playing: ${title} - Episode ${episode}` });
     updateDiscordActivity(`Watching ${title}`, `Episode ${episode}`);
@@ -505,6 +528,48 @@ export function handleRemotePause() {
 export function handleRemoteSeek(currentTime) {
     if (!state.isHost) {
         elements.videoPlayer.currentTime = currentTime;
+    }
+}
+
+export function skipIntro() {
+    if (!state.isHost || !elements.videoPlayer) return;
+    const newTime = Math.min(elements.videoPlayer.duration, elements.videoPlayer.currentTime + 85);
+    elements.videoPlayer.currentTime = newTime;
+    sendWsMessage({ type: 'seek', currentTime: newTime });
+    addChatMessage({ system: true, content: 'Skipped 85s (Intro)' });
+}
+
+async function handleVideoEnded() {
+    if (!state.isHost) return;
+    console.log('Video ended. checking for next episode...');
+
+    if (!state.episodeList || state.episodeList.length === 0) {
+        console.log('No episode list available for auto-next');
+        return;
+    }
+
+    const currentEpisodeId = state.currentVideo.episodeId;
+    const currentIndex = state.episodeList.findIndex(e => e.id === currentEpisodeId);
+
+    if (currentIndex !== -1 && currentIndex < state.episodeList.length - 1) {
+        const nextEpisode = state.episodeList[currentIndex + 1];
+        console.log('Auto-playing next episode:', nextEpisode.number);
+
+        addChatMessage({ system: true, content: `Episode finished. Auto-playing Episode ${nextEpisode.number} in 3s...` });
+
+        setTimeout(() => {
+            playEpisode(
+                nextEpisode.id,
+                state.currentVideo.title, // Assume title is same
+                nextEpisode.number,
+                null // Thumbnail might be tricky, maybe currentVideo's or let playEpisode handle it?
+                // Actually playEpisode takes thumbnail. We can use proxyImage(nextEpisode.image) if available, or just null.
+                // Looking at catalog.js, episode items have thumbnails. The state.episodeList usually just has ID, title, number, url?
+                // Consumet episodes usually don't have individual images in the list unless detailed.
+            ).catch(console.error);
+        }, 3000);
+    } else {
+        console.log('No next episode found or last episode reached.');
     }
 }
 

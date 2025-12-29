@@ -101,6 +101,9 @@
               </div>
               <div id="sync-indicator" class="pill sync-indicator hidden">Syncing...</div>
             </div>
+            <div id="hianime-warning" class="warning-banner hidden">
+              ⚠️ HiAnime Mode Active: Captions may be unavailable
+            </div>
 
             <div class="video-shell">
               <video id="video-player" playsinline crossorigin="anonymous"></video>
@@ -134,6 +137,7 @@
                 </div>
                 <div class="time-row">
                   <span id="time-display" class="time-display">0:00 / 0:00</span>
+                  <button id="skip-intro-btn" class="mini-btn text-btn" title="Skip Intro (+85s)">+85s</button>
                   <div class="video-controls-right">
                     <div class="caption-selector">
                       <button id="caption-btn" class="mini-btn" title="Captions (C)">

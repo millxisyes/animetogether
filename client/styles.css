@@ -1529,3 +1529,32 @@ video::cue {
   font-family: "Inter", sans-serif;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
+
+.text-btn {
+  width: auto !important;
+  font-size: 11px;
+  padding: 0 6px;
+  font-weight: 700;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.text-btn:hover {
+  color: var(--text);
+  border-color: var(--text);
+  background: rgba(255,255,255,0.1);
+}
+
+.warning-banner {
+  background: rgba(255, 179, 0, 0.15);
+  border: 1px solid rgba(255, 179, 0, 0.3);
+  color: #ffb300;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}

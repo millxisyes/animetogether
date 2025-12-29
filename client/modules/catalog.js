@@ -131,6 +131,7 @@ export async function loadAnimeDetails(animeId) {
         elements.animeInfo.appendChild(detailHeader);
 
         if (anime.episodes && anime.episodes.length > 0) {
+            state.episodeList = anime.episodes; // Save for auto-next
             elements.episodeList.innerHTML = '';
 
             anime.episodes.forEach(ep => {

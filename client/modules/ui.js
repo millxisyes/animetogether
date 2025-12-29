@@ -10,7 +10,8 @@ import {
     handleSeek,
     updateVolumeIcon,
     updateProgress,
-    updateTimeDisplay
+    updateTimeDisplay,
+    skipIntro
 } from './player.js';
 import { sendWsMessage } from './socket.js';
 import { captionSettings } from './captionSettings.js';
@@ -59,6 +60,8 @@ export const elements = {
     captionOptions: document.getElementById('caption-options'),
     dubToggle: document.getElementById('dub-toggle'),
     dubLabel: document.getElementById('dub-label'),
+    skipIntroBtn: document.getElementById('skip-intro-btn'),
+    hianimeWarning: document.getElementById('hianime-warning'),
 };
 
 export function showMainScreen() {
@@ -284,12 +287,23 @@ export function setupEventListeners() {
 
     if (elements.playPauseBtn) elements.playPauseBtn.addEventListener('click', togglePlayPause);
     if (elements.progressBar) elements.progressBar.addEventListener('click', handleSeek);
+    if (elements.skipIntroBtn) elements.skipIntroBtn.addEventListener('click', skipIntro);
+
+    // Restore volume
+    const storedVol = localStorage.getItem('volume');
+    if (storedVol !== null) {
+        const vol = parseFloat(storedVol);
+        if (elements.videoPlayer) elements.videoPlayer.volume = vol;
+        if (elements.volumeSlider) elements.volumeSlider.value = vol;
+        updateVolumeIcon(vol);
+    }
 
     if (elements.volumeSlider) {
         elements.volumeSlider.addEventListener('input', (e) => {
             const volume = parseFloat(e.target.value);
             elements.videoPlayer.volume = volume;
             updateVolumeIcon(volume);
+            localStorage.setItem('volume', volume);
         });
     }
     if (elements.muteBtn) {

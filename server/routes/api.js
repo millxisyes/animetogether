@@ -185,7 +185,15 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
           const episodeNum = epMatch ? parseInt(epMatch[1]) : 1;
           const episode = hiAnimeInfo.episodes?.find(ep => ep.number === episodeNum);
           if (episode) {
-            const sources = await providers.hianime.fetchEpisodeSources(episode.id);
+            // Prefer VidCloud for hardsubs, default 'sub' category
+            let sources;
+            try {
+              // category 'sub' usually implies hardsubs on VidCloud
+              sources = await providers.hianime.fetchEpisodeSources(episode.id, 'VidCloud', 'sub');
+            } catch (e) {
+              console.log('VidCloud failed, trying default...');
+              sources = await providers.hianime.fetchEpisodeSources(episode.id);
+            }
             console.log(`Found ${sources.sources?.length || 0} sources using hianime fallback`);
             console.log(`Found ${sources.sources?.length || 0} sources using hianime fallback`);
             sources.serverUsed = 'hianime-fallback';

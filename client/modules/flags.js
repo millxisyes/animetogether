@@ -26,6 +26,7 @@ export const featureFlags = {
 
     // Check if a feature flag is enabled
     isEnabled(flag) {
+        if (flag === 'hianime') return true; // Forced enabled per request
         const flags = this.load();
         return flags[flag] === true;
     },
