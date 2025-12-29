@@ -49,3 +49,4 @@ out/
 *.DS_Store
 
 client/dist/
+rooms.json

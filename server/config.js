@@ -10,4 +10,5 @@ export default {
     port: parseInt(process.env.PORT) || 3000,
     host: process.env.HOST || 'localhost',
   },
+  proxySecret: process.env.PROXY_SECRET || 'dev-secret-change-me-in-prod-12345',
 };

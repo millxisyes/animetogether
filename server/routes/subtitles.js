@@ -1,4 +1,5 @@
 import express from 'express';
+import { signUrl } from '../utils/security.js';
 
 const router = express.Router();
 
@@ -60,7 +61,15 @@ router.get('/search', async (req, res) => {
         console.log(`[Subtitles] Success. Found: ${data.total_count}`);
 
         // Ensure we always return an object with a data array
-        res.json({ data: data.data || [] });
+        const results = data.data || [];
+        results.forEach(item => {
+            if (item.attributes && item.attributes.url) {
+                const url = item.attributes.url;
+                item.attributes.proxyUrl = `/proxy/subtitle?url=${encodeURIComponent(url)}&sig=${signUrl(url)}`;
+            }
+        });
+
+        res.json({ data: results });
 
     } catch (error) {
         console.error('[Subtitles] Internal Error:', error);

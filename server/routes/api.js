@@ -1,5 +1,6 @@
 import express from 'express';
 import { ANIME } from '@consumet/extensions';
+import { signUrl } from '../utils/security.js';
 
 const router = express.Router();
 
@@ -16,6 +17,30 @@ const DEFAULT_PROVIDER = 'animekai';
 function getProvider(req) {
   const providerName = req.query.provider || DEFAULT_PROVIDER;
   return providers[providerName.toLowerCase()] || providers[DEFAULT_PROVIDER];
+}
+
+// Helper to sign sources
+function signSources(data) {
+  if (!data) return data;
+
+  if (data.sources) {
+    data.sources.forEach(s => {
+      if (s.url) {
+        const endpoint = s.isM3U8 || s.url.includes('.m3u8') ? 'hls' : 'video';
+        s.proxyUrl = `/proxy/${endpoint}?url=${encodeURIComponent(s.url)}&sig=${signUrl(s.url)}`;
+      }
+    });
+  }
+
+  if (data.subtitles) {
+    data.subtitles.forEach(s => {
+      if (s.url) {
+        s.proxyUrl = `/proxy/subtitle?url=${encodeURIComponent(s.url)}&sig=${signUrl(s.url)}`;
+      }
+    });
+  }
+
+  return data;
 }
 
 // Search anime
@@ -64,7 +89,7 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
     const isDub = dub === 'true';
     const subOrDub = isDub ? 'dub' : 'sub';
     console.log(`Getting streams for episode "${episodeId}" using ${provider.name}, dub=${isDub}`);
-    
+
     // If specific server requested, try that first
     if (server) {
       try {
@@ -73,12 +98,15 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
         if (sources.subtitles) {
           console.log(`Found ${sources.subtitles.length} inline subtitles`);
         }
-        return res.json(sources);
+        if (sources.subtitles) {
+          console.log(`Found ${sources.subtitles.length} inline subtitles`);
+        }
+        return res.json(signSources(sources));
       } catch (err) {
         console.log(`Server ${server} failed, trying fallback...`);
       }
     }
-    
+
     // Try to get available servers first
     let servers = [];
     if (provider.fetchEpisodeServers) {
@@ -89,7 +117,7 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
         console.log('Could not fetch servers, trying default...');
       }
     }
-    
+
     // Try each server until one works
     const errors = [];
     const successfulServers = [];
@@ -115,14 +143,16 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
         // Include server info in response
         sources.serverUsed = serverInfo.name;
         sources.serversAttempted = successfulServers;
-        return res.json(sources);
+        sources.serverUsed = serverInfo.name;
+        sources.serversAttempted = successfulServers;
+        return res.json(signSources(sources));
       } catch (err) {
         errors.push(`${serverInfo.name}: ${err.message}`);
         successfulServers.push(serverInfo.name);
         console.log(`Server ${serverInfo.name} failed: ${err.message}`);
       }
     }
-    
+
     // If no servers worked (or no servers list), try default with no server specified
     try {
       const sources = await provider.fetchEpisodeSources(episodeId, undefined, subOrDub);
@@ -131,12 +161,13 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
         console.log(`Found ${sources.subtitles.length} inline subtitles`);
       }
       sources.serversAttempted = successfulServers;
-      return res.json(sources);
+      sources.serversAttempted = successfulServers;
+      return res.json(signSources(sources));
     } catch (err) {
       errors.push(`default: ${err.message}`);
       console.log(`Default server failed: ${err.message}`);
     }
-    
+
     // AnimeKai-specific: Try hianime as fallback provider for this episode
     // Only try fallback if hianime feature flag is enabled by the client
     const hianimeEnabled = req.query.hianime === 'true';
@@ -156,8 +187,9 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
           if (episode) {
             const sources = await providers.hianime.fetchEpisodeSources(episode.id);
             console.log(`Found ${sources.sources?.length || 0} sources using hianime fallback`);
+            console.log(`Found ${sources.sources?.length || 0} sources using hianime fallback`);
             sources.serverUsed = 'hianime-fallback';
-            return res.json(sources);
+            return res.json(signSources(sources));
           }
         }
       } catch (fallbackErr) {
@@ -165,7 +197,7 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
         console.log(`Hianime fallback failed: ${fallbackErr.message}`);
       }
     }
-    
+
     // All servers failed
     throw new Error(`All servers failed: ${errors.join('; ')}`);
   } catch (error) {

@@ -1,4 +1,5 @@
 import express from 'express';
+import { signUrl, verifyUrl, isPrivateHost } from '../utils/security.js';
 
 const router = express.Router();
 
@@ -12,8 +13,18 @@ router.get('/hls', async (req, res) => {
     return res.status(400).json({ error: 'URL parameter is required' });
   }
 
+  const { sig } = req.query;
+  if (!verifyUrl(url, sig)) {
+    return res.status(403).json({ error: 'Invalid or missing signature' });
+  }
+
   try {
     const decodedUrl = decodeURIComponent(url);
+    const urlObj = new URL(decodedUrl);
+
+    if (isPrivateHost(urlObj.hostname)) {
+      return res.status(403).json({ error: 'Forbidden host' });
+    }
     const response = await fetch(decodedUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -44,7 +55,8 @@ router.get('/hls', async (req, res) => {
           } else {
             absoluteUrl = baseUrl + line;
           }
-          return `/proxy/hls?url=${encodeURIComponent(absoluteUrl)}`;
+          const sig = signUrl(absoluteUrl);
+          return `/proxy/hls?url=${encodeURIComponent(absoluteUrl)}&sig=${sig}`;
         }
         // Handle URI in EXT-X-KEY or similar tags
         if (line.includes('URI="')) {
@@ -55,7 +67,8 @@ router.get('/hls', async (req, res) => {
             } else {
               absoluteUri = baseUrl + uri;
             }
-            return `URI="/proxy/hls?url=${encodeURIComponent(absoluteUri)}"`;
+            const sig = signUrl(absoluteUri);
+            return `URI="/proxy/hls?url=${encodeURIComponent(absoluteUri)}&sig=${sig}"`;
           });
         }
         return line;
@@ -86,8 +99,19 @@ router.get('/video', async (req, res) => {
     return res.status(400).json({ error: 'URL parameter is required' });
   }
 
+  const { sig } = req.query;
+  if (!verifyUrl(url, sig)) {
+    return res.status(403).json({ error: 'Invalid or missing signature' });
+  }
+
   try {
     const decodedUrl = decodeURIComponent(url);
+    const urlObj = new URL(decodedUrl);
+
+    if (isPrivateHost(urlObj.hostname)) {
+      return res.status(403).json({ error: 'Forbidden host' });
+    }
+
     const response = await fetch(decodedUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -119,8 +143,18 @@ router.get('/image', async (req, res) => {
     return res.status(400).json({ error: 'URL parameter is required' });
   }
 
+  const { sig } = req.query;
+  if (!verifyUrl(url, sig)) {
+    return res.status(403).json({ error: 'Invalid or missing signature' });
+  }
+
   try {
     const decodedUrl = decodeURIComponent(url);
+    const urlObj = new URL(decodedUrl);
+
+    if (isPrivateHost(urlObj.hostname)) {
+      return res.status(403).json({ error: 'Forbidden host' });
+    }
     const response = await fetch(decodedUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -154,14 +188,24 @@ router.get('/subtitle', async (req, res) => {
     return res.status(400).json({ error: 'URL parameter is required' });
   }
 
+  const { sig } = req.query;
+  if (!verifyUrl(url, sig)) {
+    return res.status(403).json({ error: 'Invalid or missing signature' });
+  }
+
   try {
     const decodedUrl = decodeURIComponent(url);
-    
+
     // Validate that the decoded URL is a valid HTTP(S) URL
     if (!isValidUrl(decodedUrl) || (!decodedUrl.startsWith('http://') && !decodedUrl.startsWith('https://'))) {
       return res.status(400).json({ error: 'Invalid subtitle URL' });
     }
-    
+
+    const urlObj = new URL(decodedUrl);
+    if (isPrivateHost(urlObj.hostname)) {
+      return res.status(403).json({ error: 'Forbidden host' });
+    }
+
     const response = await fetch(decodedUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',

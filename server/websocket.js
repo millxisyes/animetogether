@@ -1,12 +1,51 @@
 // Room management - keyed by Discord channel ID
+import fs from 'fs';
 const rooms = new Map();
+const DATA_FILE = 'rooms.json';
+
+function saveRooms() {
+  try {
+    const serializable = Array.from(rooms.entries()).map(([id, room]) => ({
+      id,
+      hostId: room.hostId,
+      viewers: Array.from(room.viewers.entries()).map(([uid, v]) => [uid, { username: v.username, avatar: v.avatar }]),
+      currentVideo: room.currentVideo,
+      playbackState: room.playbackState
+    }));
+    fs.writeFileSync(DATA_FILE, JSON.stringify(serializable));
+  } catch (e) {
+    console.error('Failed to save rooms:', e);
+  }
+}
+
+function loadRooms() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+      data.forEach(r => {
+        rooms.set(r.id, {
+          hostId: r.hostId,
+          hostWs: null,
+          viewers: new Map(r.viewers.map(([uid, v]) => [uid, { ...v, ws: null }])),
+          currentVideo: r.currentVideo,
+          playbackState: r.playbackState
+        });
+      });
+      console.log(`Loaded ${rooms.size} rooms from storage`);
+    }
+  } catch (e) {
+    console.error('Failed to load rooms:', e);
+  }
+}
+
 
 export function setupWebSocket(wss) {
+  loadRooms();
   console.log('WebSocket server initialized');
-  
+
   wss.on('connection', (ws, req) => {
     console.log('New WebSocket connection from:', req.socket.remoteAddress);
-    
+
     let currentRoom = null;
     let odUserId = null;
     let isHost = false;
@@ -76,9 +115,12 @@ export function setupWebSocket(wss) {
         console.log(`✅ Room CREATED for channel ${channelId}, host: ${odUserId} (${username})`);
       } else {
         const room = rooms.get(channelId);
-        console.log(`Room exists for channel ${channelId}, current host: ${room.hostId}`);
-
-        if (room.hostId === odUserId) {
+        // Clean up stale connections on restart
+        if (room.hostId === odUserId && (!room.hostWs || room.hostWs.readyState !== 1)) {
+          room.hostWs = ws;
+          isHost = true;
+          console.log(`Host ${odUserId} reconnected to channel ${channelId}`);
+        } else if (room.hostId === odUserId) {
           // Host reconnected - update socket reference
           room.hostWs = ws;
           isHost = true;
@@ -91,17 +133,19 @@ export function setupWebSocket(wss) {
         }
       }
 
+      saveRooms();
+
       const room = rooms.get(channelId);
-      
+
       console.log(`Sending role to ${odUserId}: isHost=${isHost}`);
-      
+
       // Calculate estimated current time for late joiners
       let syncedPlaybackState = { ...room.playbackState };
       if (room.playbackState.playing && room.playbackState.lastUpdate) {
         const elapsed = (Date.now() - room.playbackState.lastUpdate) / 1000;
         syncedPlaybackState.currentTime = room.playbackState.currentTime + elapsed;
       }
-      
+
       // Send role assignment and current state
       ws.send(JSON.stringify({
         type: 'role',
@@ -123,7 +167,7 @@ export function setupWebSocket(wss) {
 
     function handleSync(ws, message) {
       if (!currentRoom || !isHost) return;
-      
+
       const room = rooms.get(currentRoom);
       if (!room) return;
 
@@ -143,7 +187,7 @@ export function setupWebSocket(wss) {
 
     function handlePlaybackControl(ws, message) {
       if (!currentRoom || !isHost) return;
-      
+
       const room = rooms.get(currentRoom);
       if (!room) return;
 
@@ -154,7 +198,7 @@ export function setupWebSocket(wss) {
       } else if (message.type === 'seek') {
         room.playbackState.currentTime = message.currentTime;
       }
-      
+
       room.playbackState.lastUpdate = Date.now();
 
       // Broadcast to all including host for confirmation
@@ -167,7 +211,7 @@ export function setupWebSocket(wss) {
 
     function handleLoadVideo(ws, message) {
       if (!currentRoom || !isHost) return;
-      
+
       const room = rooms.get(currentRoom);
       if (!room) return;
 
@@ -183,12 +227,12 @@ export function setupWebSocket(wss) {
         isDub: message.video?.isDub || message.isDub,
         subtitle: message.video?.subtitle || message.subtitle,
       };
-      
+
       // If message.video exists, use it directly (more complete data)
       if (message.video) {
         room.currentVideo = { ...message.video };
       }
-      
+
       room.playbackState = {
         playing: false,
         currentTime: 0,
@@ -201,11 +245,12 @@ export function setupWebSocket(wss) {
         video: room.currentVideo,
         playbackState: room.playbackState,
       });
+      saveRooms();
     }
 
     function handleChat(ws, message) {
       if (!currentRoom) return;
-      
+
       broadcastToRoom(currentRoom, {
         type: 'chat',
         odUserId,
@@ -228,7 +273,7 @@ function leaveRoom(ws, channelId, odUserId) {
       room.hostId = newHostId;
       room.hostWs = newHostData.ws;
       room.viewers.delete(newHostId);
-      
+
       // Notify new host
       newHostData.ws.send(JSON.stringify({
         type: 'role',
@@ -245,13 +290,14 @@ function leaveRoom(ws, channelId, odUserId) {
         newHostId,
         viewerCount: room.viewers.size + 1,
       });
-      
+
       console.log(`Host left, new host: ${newHostId}`);
     } else {
       // No viewers, close room
       rooms.delete(channelId);
       console.log(`Room ${channelId} closed`);
     }
+    saveRooms();
   } else {
     // Viewer left
     room.viewers.delete(odUserId);
@@ -359,6 +405,7 @@ export function forceChangeHost(channelId, newHostId) {
   });
 
   console.log(`Host changed in room ${channelId}: ${oldHostId} → ${newHostId}`);
+  saveRooms();
 
   return { success: true, oldHostId, newHostId };
 }

@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AnimeTogether</title>
   <link rel="stylesheet" href="/styles.css?v=__BUILD_VERSION__">
 </head>
+
 <body>
   <div id="loading-screen" class="screen active">
     <div class="loading-card">
@@ -26,7 +28,8 @@
         </div>
         <div class="toolbar-divider"></div>
         <button id="sidebar-toggle" class="toolbar-btn" aria-label="Toggle library" title="Library (L)">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
             <line x1="8" y1="6" x2="21" y2="6"></line>
             <line x1="8" y1="12" x2="21" y2="12"></line>
             <line x1="8" y1="18" x2="21" y2="18"></line>
@@ -36,8 +39,10 @@
           </svg>
         </button>
         <button id="fullscreen-toggle" class="toolbar-btn" aria-label="Fullscreen" title="Fullscreen (F)">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3">
+            </path>
           </svg>
         </button>
       </div>
@@ -132,7 +137,8 @@
                   <div class="video-controls-right">
                     <div class="caption-selector">
                       <button id="caption-btn" class="mini-btn" title="Captions (C)">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <rect x="2" y="2" width="20" height="20" rx="2.18"></rect>
                           <line x1="7" y1="15" x2="7.01" y2="15"></line>
                           <line x1="17" y1="15" x2="17.01" y2="15"></line>
@@ -140,7 +146,18 @@
                         </svg>
                       </button>
                       <div id="caption-menu" class="caption-menu hidden">
-                        <div class="caption-menu-header">Subtitles</div>
+                        <div class="caption-menu-header">
+                          <span>Subtitles</span>
+                          <button id="caption-settings-btn" class="icon-btn-small" title="Settings">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <circle cx="12" cy="12" r="3"></circle>
+                              <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                              </path>
+                            </svg>
+                          </button>
+                        </div>
                         <div id="caption-options" class="caption-options">
                           <button class="caption-option active" data-lang="off">Off</button>
                         </div>
@@ -148,7 +165,8 @@
                     </div>
                     <div class="volume-control">
                       <button id="mute-btn" class="mini-btn" title="Mute">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                           <path d="M15.54 8.46a7 7 0 0 1 0 9.9M19.07 4.93a10 10 0 0 1 0 14.14"></path>
                         </svg>
@@ -171,7 +189,56 @@
   </div>
 
   <!-- Subtitle indicator (no modal needed - uses embedded subs) -->
+  <div id="caption-settings-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card settings-card">
+      <div class="modal-header">
+        <h3>Caption Settings</h3>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label>Font Size</label>
+          <div class="toggle-group" id="setting-size">
+            <button data-value="0.75em">Small</button>
+            <button data-value="1em" class="active">Medium</button>
+            <button data-value="1.25em">Large</button>
+            <button data-value="1.5em">Huge</button>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label>Text Color</label>
+          <div class="color-options" id="setting-color">
+            <button data-value="#ffffff" class="color-btn active" style="background: #ffffff" title="White"></button>
+            <button data-value="#ffff00" class="color-btn" style="background: #ffff00" title="Yellow"></button>
+            <button data-value="#00ffff" class="color-btn" style="background: #00ffff" title="Cyan"></button>
+            <button data-value="#ff00ff" class="color-btn" style="background: #ff00ff" title="Magenta"></button>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label>Background Opacity</label>
+          <div class="toggle-group" id="setting-bg">
+            <button data-value="rgba(0,0,0,0)">None</button>
+            <button data-value="rgba(0,0,0,0.5)">50%</button>
+            <button data-value="rgba(0,0,0,0.75)" class="active">75%</button>
+            <button data-value="rgba(0,0,0,1)">100%</button>
+          </div>
+        </div>
+
+        <div class="preview-box">
+          <div class="preview-video">
+            <span id="caption-preview" class="preview-text">This is a caption preview</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="primary-btn" id="save-caption-settings">Done</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/dist/bundle.js?v=__BUILD_VERSION__"></script>
 </body>
+
 </html>
