@@ -25,6 +25,11 @@ function getProvider(req) {
 function signSources(data) {
   if (!data) return data;
 
+  // Map tracks to subtitles if subtitles missing
+  if (!data.subtitles && data.tracks) {
+    data.subtitles = data.tracks;
+  }
+
   if (data.sources) {
     data.sources.forEach(s => {
       if (s.url) {
@@ -36,6 +41,9 @@ function signSources(data) {
 
   if (data.subtitles) {
     data.subtitles.forEach(s => {
+      // Normalize label to lang
+      if (!s.lang && s.label) s.lang = s.label;
+
       if (s.url) {
         s.proxyUrl = `/proxy/subtitle?url=${encodeURIComponent(s.url)}&sig=${signUrl(s.url)}`;
       }

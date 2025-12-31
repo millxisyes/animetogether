@@ -418,6 +418,10 @@ export function setupEventListeners() {
                     sendWsMessage({ type: 'seek', currentTime: newTime });
                 }
                 break;
+            case '?':
+                const helpModal = document.getElementById('help-modal');
+                if (helpModal) helpModal.classList.remove('hidden');
+                break;
         }
     });
 
@@ -445,6 +449,24 @@ export function setupEventListeners() {
             elements.captionMenu.classList.add('hidden');
         }
     });
+
+    // Help Modal Logic
+    const helpModal = document.getElementById('help-modal');
+    const closeHelp = document.getElementById('close-help-modal');
+
+    if (closeHelp) {
+        closeHelp.addEventListener('click', () => {
+            helpModal.classList.add('hidden');
+        });
+    }
+
+    if (helpModal) {
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal || e.target.classList.contains('modal-backdrop')) {
+                helpModal.classList.add('hidden');
+            }
+        });
+    }
 
     if (elements.chatSend) elements.chatSend.addEventListener('click', sendChatMessage);
     if (elements.chatInput) {

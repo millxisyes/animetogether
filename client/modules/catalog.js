@@ -36,6 +36,7 @@ export async function loadRecentEpisodes() {
         const response = await fetch(`/api/anime/recent?provider=${state.provider}`);
         const data = await response.json();
         displayAnimeResults(data.results || []);
+        injectContinueWatching(); // Inject after display
     } catch (error) {
         console.error('Recent episodes error:', error);
         elements.animeResults.innerHTML = '<p class="placeholder-text">Failed to load. Try again.</p>';
@@ -50,6 +51,7 @@ export async function loadTopAiring() {
         const response = await fetch(`/api/anime/top-airing?provider=${state.provider}`);
         const data = await response.json();
         displayAnimeResults(data.results || []);
+        injectContinueWatching(); // Inject after display
     } catch (error) {
         console.error('Top airing error:', error);
         elements.animeResults.innerHTML = '<p class="placeholder-text">Failed to load. Try again.</p>';
@@ -107,6 +109,67 @@ export function loadWatchHistory() {
     } catch (e) {
         console.error('Failed to load history:', e);
         elements.animeResults.innerHTML = '<p class="placeholder-text">Failed to load history.</p>';
+    }
+}
+
+function injectContinueWatching() {
+    try {
+        const history = JSON.parse(localStorage.getItem('watchHistory') || '[]');
+        if (history.length === 0) return;
+
+        // Get most recent
+        const lastWatched = history[0]; // Assuming 0 is newest. If not, sort by timestamp?
+        // Usually we push to end? or unshift? 
+        // Let's assume index 0 for now or verify sort.
+        // Actually locally stored history might not be sorted by added.
+        // Let's protect by sorting if timestamp exists.
+        // Sort DESC
+        history.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        const item = history[0];
+
+        if (!item) return;
+
+        const card = document.createElement('div');
+        card.className = 'continue-card';
+
+        const img = document.createElement('img');
+        img.className = 'continue-image';
+        img.src = proxyImage(item.thumbnail);
+        img.alt = item.title;
+
+        const info = document.createElement('div');
+        info.className = 'continue-info';
+
+        const label = document.createElement('div');
+        label.className = 'continue-label';
+        label.textContent = 'Continue Watching';
+
+        const title = document.createElement('div');
+        title.className = 'continue-title';
+        title.textContent = item.title;
+
+        const ep = document.createElement('div');
+        ep.className = 'continue-ep';
+        ep.textContent = `Episode ${item.episode}`;
+
+        info.appendChild(label);
+        info.appendChild(title);
+        info.appendChild(ep);
+
+        card.appendChild(img);
+        card.appendChild(info);
+
+        card.addEventListener('click', () => {
+            playEpisode(item.id, item.title, item.episode, item.thumbnail);
+        });
+
+        // Prepend to results
+        if (elements.animeResults) {
+            elements.animeResults.insertBefore(card, elements.animeResults.firstChild);
+        }
+
+    } catch (e) {
+        console.error('Failed to inject continue watching:', e);
     }
 }
 

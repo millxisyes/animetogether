@@ -283,6 +283,9 @@ export function loadVideo(video, playbackState) {
                 videoElement.play().catch(() => { });
                 updatePlayPauseIcon(true);
             }
+            if (state.hls && state.hls.levels && state.hls.levels.length > 0) {
+                populateQualityMenuHls(state.hls.levels);
+            }
         });
     } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
         videoElement.src = video.url;
@@ -402,6 +405,59 @@ export function populateQualityMenu(sources) {
 
         createBtn(source.quality === 'default' ? 'Auto' : source.quality, source.quality, isActive);
     });
+}
+
+
+
+export function populateQualityMenuHls(levels) {
+    if (!elements.qualityOptions || !state.isHost) {
+        if (elements.qualityBtn) elements.qualityBtn.parentElement.style.display = 'none';
+        return;
+    }
+
+    // Show quality controls
+    if (elements.qualityBtn) elements.qualityBtn.parentElement.style.display = 'flex';
+
+    elements.qualityOptions.innerHTML = '';
+    const buttons = [];
+
+    // Helper
+    const createBtn = (label, levelIndex, isSelected) => {
+        const btn = document.createElement('button');
+        btn.className = `caption-option ${isSelected ? 'active' : ''}`;
+        btn.textContent = label;
+        btn.dataset.level = levelIndex;
+
+        btn.addEventListener('click', () => {
+            buttons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            if (elements.qualityBtn) elements.qualityBtn.textContent = label;
+            elements.qualityMenu.classList.add('hidden');
+
+            if (state.hls) {
+                console.log('Setting HLS level to:', levelIndex);
+                state.hls.currentLevel = levelIndex;
+            }
+        });
+
+        elements.qualityOptions.appendChild(btn);
+        buttons.push(btn);
+    };
+
+
+    // 1. Auto
+    createBtn('Auto', -1, state.hls.autoLevelEnabled || state.hls.currentLevel === -1);
+
+    // 2. Levels High to Low
+    const levelsWithIndex = levels.map((l, i) => ({ level: l, index: i }));
+    levelsWithIndex.sort((a, b) => b.level.height - a.level.height);
+
+    levelsWithIndex.forEach(item => {
+        const label = item.level.height ? `${item.level.height}p` : `Level ${item.index}`;
+        createBtn(label, item.index, state.hls.currentLevel === item.index);
+    });
+
 }
 
 export function loadSubtitle(url) {
@@ -831,3 +887,10 @@ export async function playPrevious() {
 
 
 
+
+export function handleVideoEnded() {
+    console.log('Video ended');
+    if (state.isHost) {
+        playNext();
+    }
+}
