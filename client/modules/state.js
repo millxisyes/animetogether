@@ -12,4 +12,5 @@ export const state = {
     isDub: false, // Sub/Dub toggle
     lastSyncTime: 0, // For late joiner sync
     episodeList: [], // For auto-next
+    roomSettings: { freeMode: false },
 };

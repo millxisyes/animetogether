@@ -20,6 +20,8 @@ import {
 } from './player.js';
 import { sendWsMessage } from './socket.js';
 import { captionSettings } from './captionSettings.js';
+import { setupSettingsListeners, toggleSettingsButton } from './settings.js';
+import { initAniList } from './anilist.js';
 
 // DOM Elements
 export const elements = {
@@ -75,6 +77,15 @@ export const elements = {
     qualityMenu: document.getElementById('quality-menu'),
     qualityOptions: document.getElementById('quality-options'),
     errorRetryBtn: document.getElementById('error-retry-btn'),
+    // Room Settings
+    roomSettingsBtn: document.getElementById('room-settings-btn'),
+    roomSettingsModal: document.getElementById('room-settings-modal'),
+    closeRoomSettings: document.getElementById('close-room-settings'),
+    settingFreeMode: document.getElementById('setting-freemode'),
+    // User Profile
+    profileBtn: document.getElementById('profile-btn'),
+    profileModal: document.getElementById('profile-modal'),
+    closeProfileModal: document.getElementById('close-profile-modal'),
 };
 
 export function showMainScreen() {
@@ -87,6 +98,8 @@ export function updateRoleUI(isHost) {
     elements.roleBadge.className = `badge ${isHost ? 'host' : 'viewer'}`;
 
     const isPip = document.body.classList.contains('pip-mode');
+
+    toggleSettingsButton(isHost);
 
     if (isHost) {
         elements.emptyMessage.textContent = 'Search and select an anime to watch together!';
@@ -232,6 +245,30 @@ function handleFullscreenChange() {
 
 export function setupEventListeners() {
     window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize);
+    setupSettingsListeners();
+    initAniList();
+
+    if (elements.profileBtn) {
+        elements.profileBtn.addEventListener('click', () => {
+            elements.profileModal.classList.remove('hidden');
+        });
+    }
+
+    if (elements.closeProfileModal) {
+        elements.closeProfileModal.addEventListener('click', () => {
+            elements.profileModal.classList.add('hidden');
+        });
+    }
+
+    // Close on backdrop click
+    if (elements.profileModal) {
+        elements.profileModal.addEventListener('click', (e) => {
+            if (e.target === elements.profileModal || e.target.classList.contains('modal-backdrop')) {
+                elements.profileModal.classList.add('hidden');
+            }
+        });
+    }
 
     if (elements.sidebarToggle) {
         elements.sidebarToggle.addEventListener('click', () => {
@@ -340,7 +377,7 @@ export function setupEventListeners() {
         elements.videoPlayer.addEventListener('click', (e) => {
             if (e.detail === 1) {
                 setTimeout(() => {
-                    if (state.isHost) togglePlayPause();
+                    if (state.isHost || (state.roomSettings && state.roomSettings.freeMode)) togglePlayPause();
                 }, 200);
             }
         });
@@ -353,7 +390,7 @@ export function setupEventListeners() {
             case ' ':
             case 'k':
                 e.preventDefault();
-                if (state.isHost) togglePlayPause();
+                if (state.isHost || (state.roomSettings && state.roomSettings.freeMode)) togglePlayPause();
                 break;
             case 'f':
                 e.preventDefault();
@@ -400,7 +437,7 @@ export function setupEventListeners() {
                 }
                 break;
             case 'ArrowLeft':
-                if (state.isHost && state.currentVideo) {
+                if ((state.isHost || (state.roomSettings && state.roomSettings.freeMode)) && state.currentVideo) {
                     e.preventDefault();
                     const newTime = Math.max(0, elements.videoPlayer.currentTime - 10);
                     elements.videoPlayer.currentTime = newTime;
@@ -408,7 +445,7 @@ export function setupEventListeners() {
                 }
                 break;
             case 'ArrowRight':
-                if (state.isHost && state.currentVideo) {
+                if ((state.isHost || (state.roomSettings && state.roomSettings.freeMode)) && state.currentVideo) {
                     e.preventDefault();
                     const newTime = Math.min(elements.videoPlayer.duration, elements.videoPlayer.currentTime + 10);
                     elements.videoPlayer.currentTime = newTime;
@@ -417,7 +454,7 @@ export function setupEventListeners() {
                 break;
             case 'j':
             case 'J':
-                if (state.isHost && state.currentVideo) {
+                if ((state.isHost || (state.roomSettings && state.roomSettings.freeMode)) && state.currentVideo) {
                     e.preventDefault();
                     const newTime = Math.max(0, elements.videoPlayer.currentTime - 10);
                     elements.videoPlayer.currentTime = newTime;
@@ -426,7 +463,7 @@ export function setupEventListeners() {
                 break;
             case 'l':
             case 'L':
-                if (state.isHost && state.currentVideo) {
+                if ((state.isHost || (state.roomSettings && state.roomSettings.freeMode)) && state.currentVideo) {
                     e.preventDefault();
                     const newTime = Math.min(elements.videoPlayer.duration, elements.videoPlayer.currentTime + 10);
                     elements.videoPlayer.currentTime = newTime;

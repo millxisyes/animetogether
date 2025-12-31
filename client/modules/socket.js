@@ -11,6 +11,7 @@ import {
     syncPlaybackForLateJoiner,
     updateCaptionButtonState
 } from './player.js';
+import { updateSettingsUI } from './settings.js';
 import { updateDiscordActivity } from './auth.js';
 
 export function isWebSocketOpen() {
@@ -129,6 +130,10 @@ function handleWebSocketMessage(message) {
         case 'error':
             addChatMessage({ system: true, content: `Error: ${message.message}` });
             break;
+        case 'settings-update':
+            updateSettingsUI(message.settings);
+            addChatMessage({ system: true, content: 'Room settings updated.' });
+            break;
     }
 }
 
@@ -136,6 +141,11 @@ function handleRoleAssignment(message) {
     state.isHost = message.isHost;
     elements.viewerCount.textContent = message.viewerCount;
     updateRoleUI(state.isHost);
+
+    // Initial Settings
+    if (message.settings) {
+        updateSettingsUI(message.settings);
+    }
 
     // Late joiner sync - if there's a video playing, sync to it
     if (message.currentVideo && message.currentVideo.episodeId) {

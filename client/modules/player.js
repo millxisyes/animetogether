@@ -4,6 +4,7 @@ import { elements, showStreamError, addChatMessage } from './ui.js';
 import { formatTime } from './utils.js';
 import { sendWsMessage } from './socket.js';
 import { updateDiscordActivity } from './auth.js';
+import { updateAniListProgress } from './anilist.js';
 import { featureFlags } from './flags.js';
 import { proxyImage } from './utils.js'; // Needed for next episode thumbnail
 
@@ -501,7 +502,7 @@ export function updatePlayPauseIcon(playing) {
 }
 
 export function togglePlayPause() {
-    if (!state.isHost) return;
+    if (!state.isHost && !(state.roomSettings && state.roomSettings.freeMode)) return;
     const video = elements.videoPlayer;
     if (video.paused) {
         video.play().catch(() => { });
@@ -528,7 +529,7 @@ export function updateVolumeIcon(volume) {
 }
 
 export function handleSeek(e) {
-    if (!state.isHost) return;
+    if (!state.isHost && !(state.roomSettings && state.roomSettings.freeMode)) return;
     if (!elements.videoPlayer.duration || !isFinite(elements.videoPlayer.duration)) return;
     const rect = elements.progressBar.getBoundingClientRect();
     const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -564,6 +565,23 @@ export function updateProgress() {
     // Let's save for everyone if they are watching.
     // Actually limit it to whenever progress updates.
     saveToHistory();
+
+    // Check for AniList scrobble (90%)
+    checkAniListProgress(video);
+}
+
+// Throttle AniList updates to avoid spam
+let anilistUpdatedEpisode = null;
+function checkAniListProgress(video) {
+    if (!state.currentVideo || !state.currentVideo.episode) return;
+
+    // Avoid double update for same episode session
+    if (anilistUpdatedEpisode === state.currentVideo.episodeId) return;
+
+    if (video.duration > 0 && (video.currentTime / video.duration) > 0.9) {
+        anilistUpdatedEpisode = state.currentVideo.episodeId;
+        updateAniListProgress(state.currentVideo.title, state.currentVideo.episode);
+    }
 }
 
 export function updateTimeDisplay() {
@@ -701,7 +719,7 @@ export function handleRemoteSeek(currentTime) {
 }
 
 export function skipIntro() {
-    if (!state.isHost || !elements.videoPlayer) return;
+    if ((!state.isHost && !(state.roomSettings && state.roomSettings.freeMode)) || !elements.videoPlayer) return;
     const newTime = Math.min(elements.videoPlayer.duration, elements.videoPlayer.currentTime + 85);
     elements.videoPlayer.currentTime = newTime;
     sendWsMessage({ type: 'seek', currentTime: newTime });

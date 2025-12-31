@@ -47,7 +47,8 @@ async function saveRooms() {
         hostId: room.hostId,
         viewers: Array.from(room.viewers.entries()).map(([uid, v]) => [uid, { username: v.username, avatar: v.avatar }]),
         currentVideo: room.currentVideo,
-        playbackState: room.playbackState
+        playbackState: room.playbackState,
+        settings: room.settings || { freeMode: false }
       }));
 
       const json = JSON.stringify(serializable);
@@ -81,7 +82,8 @@ function loadRooms() {
           hostWs: null,
           viewers: new Map(r.viewers.map(([uid, v]) => [uid, { ...v, ws: null }])),
           currentVideo: r.currentVideo,
-          playbackState: r.playbackState
+          playbackState: r.playbackState,
+          settings: r.settings || { freeMode: false }
         });
       });
       console.log(`Loaded ${rooms.size} rooms from storage`);
@@ -163,6 +165,9 @@ export function setupWebSocket(wss) {
         case 'chat':
           handleChat(ws, message);
           break;
+        case 'update-settings':
+          handleSettings(ws, message);
+          break;
       }
     }
 
@@ -238,6 +243,7 @@ export function setupWebSocket(wss) {
             currentTime: 0,
             lastUpdate: Date.now(),
           },
+          settings: { freeMode: false }
         });
         isHost = true;
         console.log(`✅ Room CREATED for channel ${safeChannelId}, host: ${odUserId} (${safeUsername})`);
@@ -282,6 +288,7 @@ export function setupWebSocket(wss) {
         currentVideo: room.currentVideo,
         playbackState: syncedPlaybackState,
         viewerCount: room.viewers.size + 1,
+        settings: room.settings
       }));
 
       // Notify others about new viewer
@@ -314,10 +321,14 @@ export function setupWebSocket(wss) {
     }
 
     function handlePlaybackControl(ws, message) {
-      if (!currentRoom || !isHost) return;
+      if (!currentRoom) return;
 
       const room = rooms.get(currentRoom);
       if (!room) return;
+
+      // Permission Check
+      const canControl = isHost || (room.settings && room.settings.freeMode);
+      if (!canControl) return;
 
       if (message.type === 'play') {
         room.playbackState.playing = true;
@@ -374,6 +385,25 @@ export function setupWebSocket(wss) {
         playbackState: room.playbackState,
       });
       saveRooms();
+    }
+
+    function handleSettings(ws, message) {
+      if (!currentRoom || !isHost) return;
+
+      const room = rooms.get(currentRoom);
+      if (!room) return;
+
+      // Update settings
+      if (message.settings) {
+        room.settings = { ...room.settings, ...message.settings };
+
+        // Broadcast new settings
+        broadcastToRoom(currentRoom, {
+          type: 'settings-update',
+          settings: room.settings
+        });
+        saveRooms();
+      }
     }
 
     function handleChat(ws, message) {
@@ -441,6 +471,7 @@ function leaveRoom(ws, channelId, odUserId) {
         currentVideo: room.currentVideo,
         playbackState: room.playbackState,
         viewerCount: room.viewers.size + 1,
+        settings: room.settings
       }));
 
       // Notify others

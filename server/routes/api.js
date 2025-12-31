@@ -83,20 +83,9 @@ router.get('/anime/info/:id', async (req, res) => {
 
   try {
     const provider = getProvider(req);
-    const cacheKey = Cache.generateKey('info', provider.name, id);
-    const cachedResult = cache.get(cacheKey);
-
-    if (cachedResult) {
-      console.log(`[Cache] Serving info for "${id}"`);
-      return res.json(cachedResult);
-    }
-
     console.log(`Getting info for "${id}" using ${provider.name}`);
     const info = await provider.fetchAnimeInfo(id);
     console.log(`Found anime: ${info.title}, episodes: ${info.episodes?.length || 0}`);
-
-    // Cache for 60 minutes
-    cache.set(cacheKey, info, 60 * 60);
 
     res.json(info);
   } catch (error) {
@@ -117,13 +106,15 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
 
     // We don't cache streaming links aggressively because they might expire
     // But short term caching (15 mins) helps with page refreshes
-    const cacheKey = Cache.generateKey('watch', provider.name, episodeId, isDub, server || 'default');
-    const cachedResult = cache.get(cacheKey);
+    // We don't cache streaming links aggressively because they might expire
+    // But short term caching (15 mins) helps with page refreshes
+    // const cacheKey = Cache.generateKey('watch', provider.name, episodeId, isDub, server || 'default');
+    // const cachedResult = cache.get(cacheKey);
 
-    if (cachedResult) {
-      console.log(`[Cache] Serving stream links for "${episodeId}"`);
-      return res.json(signSources(cachedResult));
-    }
+    // if (cachedResult) {
+    //   console.log(`[Cache] Serving stream links for "${episodeId}"`);
+    //   return res.json(signSources(cachedResult));
+    // }
 
     console.log(`Getting streams for episode "${episodeId}" using ${provider.name}, dub=${isDub}`);
 
@@ -136,7 +127,11 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
           console.log(`Found ${sources.subtitles.length} inline subtitles`);
         }
 
-        cache.set(cacheKey, sources, 15 * 60);
+        if (sources.subtitles) {
+          console.log(`Found ${sources.subtitles.length} inline subtitles`);
+        }
+
+        // cache.set(cacheKey, sources, 15 * 60);
         return res.json(signSources(sources));
       } catch (err) {
         console.log(`Server ${server} failed, trying fallback...`);
@@ -180,7 +175,7 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
         sources.serverUsed = serverInfo.name;
         sources.serversAttempted = successfulServers;
 
-        cache.set(cacheKey, sources, 15 * 60);
+        // cache.set(cacheKey, sources, 15 * 60);
         return res.json(signSources(sources));
       } catch (err) {
         errors.push(`${serverInfo.name}: ${err.message}`);
@@ -198,7 +193,7 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
       }
       sources.serversAttempted = successfulServers;
 
-      cache.set(cacheKey, sources, 15 * 60);
+      // cache.set(cacheKey, sources, 15 * 60);
       return res.json(signSources(sources));
     } catch (err) {
       errors.push(`default: ${err.message}`);

@@ -58,10 +58,13 @@ app.use('/dist', express.static(join(__dirname, '../client/dist')));
 
 
 
+import anilistRoutes from './routes/anilist.js';
+
 // API routes for anime browsing (proxied to Consumet)
 app.use('/api', apiRoutes);
 
-
+// AniList Auth
+app.use('/api/anilist', anilistRoutes);
 
 // Subtitles search/download helper
 app.use('/api/subtitles', subtitlesRoutes);
