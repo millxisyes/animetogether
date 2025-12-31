@@ -1,6 +1,7 @@
 import express from 'express';
 import { ANIME } from '@consumet/extensions';
 import { signUrl } from '../utils/security.js';
+import { cache, Cache } from '../utils/cache.js';
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ const providers = {
 // Default provider
 const DEFAULT_PROVIDER = 'animekai';
 
+// Helper to get provider
 // Helper to get provider
 function getProvider(req) {
   const providerName = req.query.provider || DEFAULT_PROVIDER;
@@ -53,9 +55,21 @@ router.get('/anime/search', async (req, res) => {
 
   try {
     const provider = getProvider(req);
+    const cacheKey = Cache.generateKey('search', provider.name, query, page);
+    const cachedResult = cache.get(cacheKey);
+
+    if (cachedResult) {
+      console.log(`[Cache] Serving search results for "${query}"`);
+      return res.json(cachedResult);
+    }
+
     console.log(`Searching for "${query}" using ${provider.name}`);
     const results = await provider.search(query, parseInt(page));
     console.log(`Found ${results.results?.length || 0} results`);
+
+    // Cache for 30 minutes
+    cache.set(cacheKey, results, 30 * 60);
+
     res.json(results);
   } catch (error) {
     console.error('Search error:', error);
@@ -69,9 +83,21 @@ router.get('/anime/info/:id', async (req, res) => {
 
   try {
     const provider = getProvider(req);
+    const cacheKey = Cache.generateKey('info', provider.name, id);
+    const cachedResult = cache.get(cacheKey);
+
+    if (cachedResult) {
+      console.log(`[Cache] Serving info for "${id}"`);
+      return res.json(cachedResult);
+    }
+
     console.log(`Getting info for "${id}" using ${provider.name}`);
     const info = await provider.fetchAnimeInfo(id);
     console.log(`Found anime: ${info.title}, episodes: ${info.episodes?.length || 0}`);
+
+    // Cache for 60 minutes
+    cache.set(cacheKey, info, 60 * 60);
+
     res.json(info);
   } catch (error) {
     console.error('Info error:', error);
@@ -88,6 +114,17 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
     const provider = getProvider(req);
     const isDub = dub === 'true';
     const subOrDub = isDub ? 'dub' : 'sub';
+
+    // We don't cache streaming links aggressively because they might expire
+    // But short term caching (15 mins) helps with page refreshes
+    const cacheKey = Cache.generateKey('watch', provider.name, episodeId, isDub, server || 'default');
+    const cachedResult = cache.get(cacheKey);
+
+    if (cachedResult) {
+      console.log(`[Cache] Serving stream links for "${episodeId}"`);
+      return res.json(signSources(cachedResult));
+    }
+
     console.log(`Getting streams for episode "${episodeId}" using ${provider.name}, dub=${isDub}`);
 
     // If specific server requested, try that first
@@ -98,9 +135,8 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
         if (sources.subtitles) {
           console.log(`Found ${sources.subtitles.length} inline subtitles`);
         }
-        if (sources.subtitles) {
-          console.log(`Found ${sources.subtitles.length} inline subtitles`);
-        }
+
+        cache.set(cacheKey, sources, 15 * 60);
         return res.json(signSources(sources));
       } catch (err) {
         console.log(`Server ${server} failed, trying fallback...`);
@@ -143,8 +179,8 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
         // Include server info in response
         sources.serverUsed = serverInfo.name;
         sources.serversAttempted = successfulServers;
-        sources.serverUsed = serverInfo.name;
-        sources.serversAttempted = successfulServers;
+
+        cache.set(cacheKey, sources, 15 * 60);
         return res.json(signSources(sources));
       } catch (err) {
         errors.push(`${serverInfo.name}: ${err.message}`);
@@ -161,7 +197,8 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
         console.log(`Found ${sources.subtitles.length} inline subtitles`);
       }
       sources.serversAttempted = successfulServers;
-      sources.serversAttempted = successfulServers;
+
+      cache.set(cacheKey, sources, 15 * 60);
       return res.json(signSources(sources));
     } catch (err) {
       errors.push(`default: ${err.message}`);
@@ -195,8 +232,12 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
               sources = await providers.hianime.fetchEpisodeSources(episode.id);
             }
             console.log(`Found ${sources.sources?.length || 0} sources using hianime fallback`);
-            console.log(`Found ${sources.sources?.length || 0} sources using hianime fallback`);
             sources.serverUsed = 'hianime-fallback';
+
+            // Should we cache fallback results? Maybe better not to mix providers in cache key without being explicit
+            // But since cacheKey includes provider name from original request... 
+            // Actually, let's cache it but it might be confusing if AnimeKai comes back up. 
+            // Let's NOT cache fallback for now, so we retry main provider next time.
             return res.json(signSources(sources));
           }
         }
@@ -225,6 +266,14 @@ router.get('/anime/top-airing', async (req, res) => {
 
   try {
     const provider = getProvider(req);
+    const cacheKey = Cache.generateKey('top-airing', provider.name, page);
+    const cachedResult = cache.get(cacheKey);
+
+    if (cachedResult) {
+      console.log(`[Cache] Serving top airing`);
+      return res.json(cachedResult);
+    }
+
     console.log(`Getting top airing using ${provider.name}`);
 
     // Not all providers support topAiring, fallback to trending or popular if needed
@@ -239,6 +288,10 @@ router.get('/anime/top-airing', async (req, res) => {
     }
 
     console.log(`Found ${results.results?.length || 0} items`);
+
+    // Cache for 10 minutes
+    cache.set(cacheKey, results, 10 * 60);
+
     res.json(results);
   } catch (error) {
     console.error('Top airing error:', error);
@@ -252,6 +305,14 @@ router.get('/anime/recent', async (req, res) => {
 
   try {
     const provider = getProvider(req);
+    const cacheKey = Cache.generateKey('recent', provider.name, page);
+    const cachedResult = cache.get(cacheKey);
+
+    if (cachedResult) {
+      console.log(`[Cache] Serving recent episodes`);
+      return res.json(cachedResult);
+    }
+
     console.log(`Getting recent episodes using ${provider.name}`);
 
     let results;
@@ -264,6 +325,10 @@ router.get('/anime/recent', async (req, res) => {
     }
 
     console.log(`Found ${results.results?.length || 0} recent episodes`);
+
+    // Cache for 10 minutes
+    cache.set(cacheKey, results, 10 * 60);
+
     res.json(results);
   } catch (error) {
     console.error('Recent error:', error);

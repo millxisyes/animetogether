@@ -14,8 +14,12 @@ export async function fetchAndLoadVideoForViewer(videoInfo, playbackState) {
     elements.emptyState.classList.add('hidden');
     elements.videoWrapper.classList.remove('hidden');
     elements.videoLoadingOverlay.classList.remove('hidden');
+    // Hide retry button for initial load, show on error
+    if (elements.errorRetryBtn) elements.errorRetryBtn.style.display = 'none';
+
     elements.videoLoadingSpinner.style.display = 'flex';
     elements.videoLoadingText.textContent = 'Loading episode...';
+
 
     try {
         const dubParam = videoInfo.isDub ? '&dub=true' : '';
@@ -80,6 +84,7 @@ export async function fetchAndLoadVideoForViewer(videoInfo, playbackState) {
             console.error('No sources found for viewer');
             elements.videoLoadingSpinner.style.display = 'none';
             elements.videoLoadingText.textContent = 'No sources available for this episode';
+            if (elements.errorRetryBtn) elements.errorRetryBtn.style.display = 'block';
             showStreamError('No video sources found. Try a different episode or provider.');
 
             setTimeout(() => {
@@ -94,6 +99,7 @@ export async function fetchAndLoadVideoForViewer(videoInfo, playbackState) {
         console.error('Failed to fetch fresh stream for viewer:', error);
         elements.videoLoadingSpinner.style.display = 'none';
         elements.videoLoadingText.textContent = 'Error loading stream';
+        if (elements.errorRetryBtn) elements.errorRetryBtn.style.display = 'block';
         showStreamError(`Failed to load streams: ${error.message}`);
 
         setTimeout(() => {
@@ -113,6 +119,9 @@ export async function playEpisode(episodeId, title, episode, thumbnail) {
     elements.emptyState.classList.add('hidden');
     elements.videoWrapper.classList.remove('hidden');
     elements.videoLoadingOverlay.classList.remove('hidden');
+    // Hide retry button for initial load
+    if (elements.errorRetryBtn) elements.errorRetryBtn.style.display = 'none';
+
     elements.videoLoadingSpinner.style.display = 'flex';
     elements.videoLoadingText.textContent = 'Loading episode...';
 
@@ -206,6 +215,7 @@ export async function playEpisode(episodeId, title, episode, thumbnail) {
         } else {
             elements.videoLoadingSpinner.style.display = 'none';
             elements.videoLoadingText.textContent = 'No sources available';
+            if (elements.errorRetryBtn) elements.errorRetryBtn.style.display = 'block';
             showStreamError('No video sources found for this episode. Try a different episode or provider.');
             addChatMessage({ system: true, content: 'No video sources found for this episode' });
             setTimeout(() => elements.videoLoadingOverlay.classList.add('hidden'), 3000);
@@ -214,6 +224,7 @@ export async function playEpisode(episodeId, title, episode, thumbnail) {
         console.error('Play episode error:', error);
         elements.videoLoadingSpinner.style.display = 'none';
         elements.videoLoadingText.textContent = 'Error loading stream';
+        if (elements.errorRetryBtn) elements.errorRetryBtn.style.display = 'block';
         showStreamError(`Stream error: ${error.message}`);
         addChatMessage({ system: true, content: `Failed to load episode: ${error.message}` });
         setTimeout(() => elements.videoLoadingOverlay.classList.add('hidden'), 3000);
@@ -282,6 +293,107 @@ export function loadVideo(video, playbackState) {
 
     addChatMessage({ system: true, content: `Now playing: ${title} - Episode ${episode}` });
     updateDiscordActivity(`Watching ${title}`, `Episode ${episode}`);
+
+    // Populate quality menu using sources or HLS levels
+    if (video.sources) {
+        populateQualityMenu(video.sources);
+    }
+}
+
+export function populateQualityMenu(sources) {
+    if (!elements.qualityOptions || !state.isHost) {
+        if (elements.qualityBtn) elements.qualityBtn.parentElement.style.display = 'none'; // Hide if not host
+        return;
+    }
+
+    // Show quality controls
+    if (elements.qualityBtn) elements.qualityBtn.parentElement.style.display = 'flex';
+
+    elements.qualityOptions.innerHTML = '';
+    const buttons = [];
+
+    // Helper to create button
+    const createBtn = (label, quality, isSelected) => {
+        const btn = document.createElement('button');
+        btn.className = `caption-option ${isSelected ? 'active' : ''}`;
+        btn.textContent = label;
+        btn.dataset.quality = quality;
+
+        btn.addEventListener('click', () => {
+            // UI Update
+            buttons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (elements.qualityBtn) elements.qualityBtn.textContent = label === 'default' ? 'Auto' : label;
+            elements.qualityMenu.classList.add('hidden');
+
+            // Logic
+            const targetSource = sources.find(s => s.quality === quality);
+            if (targetSource && state.currentVideo) {
+                const currentTime = elements.videoPlayer.currentTime;
+                const wasPlaying = !elements.videoPlayer.paused;
+
+                // Update URL
+                state.currentVideo.url = targetSource.proxyUrl;
+
+                // Reload HLS or Src
+                const videoElement = elements.videoPlayer;
+                if (state.hls) {
+                    state.hls.loadSource(targetSource.proxyUrl);
+                } else {
+                    videoElement.src = targetSource.proxyUrl;
+                }
+
+                // Seek back to time
+                const restoreTime = () => {
+                    videoElement.currentTime = currentTime;
+                    if (wasPlaying) videoElement.play().catch(() => { });
+                };
+
+                if (state.hls) {
+                    state.hls.once(Hls.Events.MANIFEST_PARSED, restoreTime);
+                } else {
+                    videoElement.addEventListener('loadedmetadata', restoreTime, { once: true });
+                }
+
+                // Notify peers of new URL? 
+                // Actually peers should probably stick to their own quality or 'auto'. 
+                // But if we want to force everyone onto a specific source we can via sync.
+                // Ideally, just switch local quality for host is fine, peers handle their own via separate fetch. 
+                // But wait, playEpisode sets the URL for everyone via ws 'load-video'.
+                // If host switches quality, we probably SHOULD update the 'currentVideo' state but NOT necessarily force execute 'load-video' for everyone unless we want to force quality.
+                // For now, let's keep it client-side for the host. 
+                // If we want viewers to have quality control, we need to expose the sources list to them in 'load-video'.
+                // We already pass `sources: allSources` in `playEpisode`, so viewers HAVE the list.
+                // So we just need to enable the menu for viewers too!
+            }
+        });
+
+        elements.qualityOptions.appendChild(btn);
+        buttons.push(btn);
+    };
+
+    // Sort: default/auto first, then high to low resolutions
+    const priorityOrder = ['default', 'auto', '1080p', '720p', '480p', '360p'];
+    const sorted = [...sources].sort((a, b) => {
+        const aIndex = priorityOrder.indexOf(a.quality);
+        const bIndex = priorityOrder.indexOf(b.quality);
+        // If both known, compare index
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+        // If only a known
+        if (aIndex !== -1) return -1;
+        // If only b known
+        if (bIndex !== -1) return 1;
+        return 0;
+    });
+
+    sorted.forEach(source => {
+        // Determine if active
+        // Simplistic check: if source url matches current
+        let isActive = false;
+        if (state.currentVideo && state.currentVideo.url === source.proxyUrl) isActive = true;
+
+        createBtn(source.quality === 'default' ? 'Auto' : source.quality, source.quality, isActive);
+    });
 }
 
 export function loadSubtitle(url) {

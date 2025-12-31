@@ -23,19 +23,52 @@ const MAX_MESSAGES_PER_WINDOW = 30; // Max chat messages per minute
 const blockedIPs = new Map();       // IP -> unblockTime timestamp
 const BLOCK_DURATION = 10 * 60 * 1000; // 10 minute ban for spammers
 
-function saveRooms() {
-  try {
-    const serializable = Array.from(rooms.entries()).map(([id, room]) => ({
-      id,
-      hostId: room.hostId,
-      viewers: Array.from(room.viewers.entries()).map(([uid, v]) => [uid, { username: v.username, avatar: v.avatar }]),
-      currentVideo: room.currentVideo,
-      playbackState: room.playbackState
-    }));
-    fs.writeFileSync(DATA_FILE, JSON.stringify(serializable));
-  } catch (e) {
-    console.error('Failed to save rooms:', e);
-  }
+// === Persistence (Throttled & Async) ===
+let saveTimeout = null;
+let isSaving = false;
+let hasPendingSave = false;
+const SAVE_DELAY = 1000; // Wait 1s after last change before saving
+
+async function saveRooms() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+
+  saveTimeout = setTimeout(async () => {
+    if (isSaving) {
+      hasPendingSave = true;
+      return;
+    }
+
+    isSaving = true;
+
+    try {
+      // Create serializable snapshot synchronously to ensure consistency
+      const serializable = Array.from(rooms.entries()).map(([id, room]) => ({
+        id,
+        hostId: room.hostId,
+        viewers: Array.from(room.viewers.entries()).map(([uid, v]) => [uid, { username: v.username, avatar: v.avatar }]),
+        currentVideo: room.currentVideo,
+        playbackState: room.playbackState
+      }));
+
+      const json = JSON.stringify(serializable);
+      const tempFile = `${DATA_FILE}.tmp`;
+
+      // Write to temp file asynchronously
+      await fs.promises.writeFile(tempFile, json, 'utf8');
+
+      // Atomic rename
+      await fs.promises.rename(tempFile, DATA_FILE);
+
+    } catch (e) {
+      console.error('Failed to save rooms:', e);
+    } finally {
+      isSaving = false;
+      if (hasPendingSave) {
+        hasPendingSave = false;
+        saveRooms(); // Trigger pending save
+      }
+    }
+  }, SAVE_DELAY);
 }
 
 function loadRooms() {

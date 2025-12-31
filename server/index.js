@@ -27,13 +27,16 @@ app.use(cors());
 app.use(express.json());
 
 // Serve index.html with dynamic cache-busting version
+// Cache index.html in memory
+const htmlPath = join(__dirname, '../client/index.html');
+let cachedHtml = readFileSync(htmlPath, 'utf-8');
+cachedHtml = cachedHtml.replace(/__BUILD_VERSION__/g, BUILD_VERSION);
+
+// Serve index.html from memory
 app.get('/', (req, res) => {
-  const htmlPath = join(__dirname, '../client/index.html');
-  let html = readFileSync(htmlPath, 'utf-8');
-  html = html.replace(/__BUILD_VERSION__/g, BUILD_VERSION);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.send(html);
+  res.send(cachedHtml);
 });
 
 // Serve static files for the Discord Activity client with proper cache control

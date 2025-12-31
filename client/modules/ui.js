@@ -71,6 +71,10 @@ export const elements = {
     speedMenu: document.getElementById('speed-menu'),
     nextBtn: document.getElementById('next-btn'),
     prevBtn: document.getElementById('prev-btn'),
+    qualityBtn: document.getElementById('quality-btn'),
+    qualityMenu: document.getElementById('quality-menu'),
+    qualityOptions: document.getElementById('quality-options'),
+    errorRetryBtn: document.getElementById('error-retry-btn'),
 };
 
 export function showMainScreen() {
@@ -355,8 +359,8 @@ export function setupEventListeners() {
                 e.preventDefault();
                 toggleFullscreen();
                 break;
-            case 'l':
-            case 'L':
+            case 'b':
+            case 'B':
                 if (state.isHost && elements.sidebar) {
                     e.preventDefault();
                     elements.sidebar.classList.toggle('hidden');
@@ -404,6 +408,24 @@ export function setupEventListeners() {
                 }
                 break;
             case 'ArrowRight':
+                if (state.isHost && state.currentVideo) {
+                    e.preventDefault();
+                    const newTime = Math.min(elements.videoPlayer.duration, elements.videoPlayer.currentTime + 10);
+                    elements.videoPlayer.currentTime = newTime;
+                    sendWsMessage({ type: 'seek', currentTime: newTime });
+                }
+                break;
+            case 'j':
+            case 'J':
+                if (state.isHost && state.currentVideo) {
+                    e.preventDefault();
+                    const newTime = Math.max(0, elements.videoPlayer.currentTime - 10);
+                    elements.videoPlayer.currentTime = newTime;
+                    sendWsMessage({ type: 'seek', currentTime: newTime });
+                }
+                break;
+            case 'l':
+            case 'L':
                 if (state.isHost && state.currentVideo) {
                     e.preventDefault();
                     const newTime = Math.min(elements.videoPlayer.duration, elements.videoPlayer.currentTime + 10);
@@ -475,12 +497,41 @@ export function setupEventListeners() {
         });
     });
 
-    // Close speed menu on click outside
+    // Close menus on click outside
     document.addEventListener('click', (e) => {
         if (elements.speedMenu && !elements.speedMenu.contains(e.target) && e.target !== elements.speedBtn) {
             elements.speedMenu.classList.add('hidden');
         }
+        if (elements.qualityMenu && !elements.qualityMenu.contains(e.target) && e.target !== elements.qualityBtn) {
+            elements.qualityMenu.classList.add('hidden');
+        }
     });
+
+    if (elements.qualityBtn) {
+        elements.qualityBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            elements.qualityMenu.classList.toggle('hidden');
+            if (elements.speedMenu) elements.speedMenu.classList.add('hidden');
+            if (elements.captionMenu) elements.captionMenu.classList.add('hidden');
+        });
+    }
+
+    if (elements.errorRetryBtn) {
+        elements.errorRetryBtn.addEventListener('click', () => {
+            elements.streamErrorAlert.classList.add('hidden');
+            // Retry current video
+            if (state.currentVideo) {
+                import('./player.js').then(m => {
+                    m.playEpisode(
+                        state.currentVideo.episodeId,
+                        state.currentVideo.title,
+                        state.currentVideo.episode,
+                        state.currentVideo.thumbnail
+                    );
+                });
+            }
+        });
+    }
 
     // Initialize Caption Settings
     captionSettings.load();

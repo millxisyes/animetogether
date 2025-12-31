@@ -126,6 +126,9 @@ function handleWebSocketMessage(message) {
         case 'chat':
             addChatMessage(message);
             break;
+        case 'error':
+            addChatMessage({ system: true, content: `Error: ${message.message}` });
+            break;
     }
 }
 

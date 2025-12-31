@@ -123,6 +123,8 @@
                     <div class="error-message-block">
                       <h3>Stream Error</h3>
                       <p id="stream-error-message">Failed to load streaming sources</p>
+                      <button id="error-retry-btn" class="ghost-btn"
+                        style="margin-top: 8px; padding: 4px 8px; font-size: 12px;">Retry</button>
                     </div>
                     <button id="error-dismiss-btn" class="error-dismiss-btn">✕</button>
                   </div>
@@ -163,6 +165,14 @@
                         <button class="caption-option" data-speed="1.25">1.25x</button>
                         <button class="caption-option" data-speed="1.5">1.5x</button>
                         <button class="caption-option" data-speed="2">2x</button>
+                      </div>
+
+                      <button id="quality-btn" class="mini-btn text-btn" title="Video Quality">Auto</button>
+                      <div id="quality-menu" class="caption-menu hidden" style="width: 100px; min-width: 100px;">
+                        <div class="caption-menu-header">Quality</div>
+                        <div id="quality-options" class="caption-options">
+                          <!-- Populated by JS -->
+                        </div>
                       </div>
                     </div>
                     <div class="caption-selector">
