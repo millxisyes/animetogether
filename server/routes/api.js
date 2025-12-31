@@ -15,7 +15,6 @@ const providers = {
 const DEFAULT_PROVIDER = 'animekai';
 
 // Helper to get provider
-// Helper to get provider
 function getProvider(req) {
   const providerName = req.query.provider || DEFAULT_PROVIDER;
   return providers[providerName.toLowerCase()] || providers[DEFAULT_PROVIDER];
@@ -112,8 +111,6 @@ router.get('/anime/watch/:episodeId', async (req, res) => {
     const isDub = dub === 'true';
     const subOrDub = isDub ? 'dub' : 'sub';
 
-    // We don't cache streaming links aggressively because they might expire
-    // But short term caching (15 mins) helps with page refreshes
     // We don't cache streaming links aggressively because they might expire
     // But short term caching (15 mins) helps with page refreshes
     // const cacheKey = Cache.generateKey('watch', provider.name, episodeId, isDub, server || 'default');

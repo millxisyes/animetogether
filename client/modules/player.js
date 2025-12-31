@@ -10,7 +10,7 @@ import { featureFlags } from './flags.js';
 import { proxyImage } from './utils.js'; // Needed for next episode thumbnail
 
 export async function fetchAndLoadVideoForViewer(videoInfo, playbackState) {
-    console.log('Viewer: fetching fresh stream for episode', videoInfo.episodeId);
+    // console.log('Viewer: fetching fresh stream for episode', videoInfo.episodeId);
 
     elements.nowPlaying.textContent = 'Loading...';
     elements.emptyState.classList.add('hidden');
@@ -165,7 +165,7 @@ export async function playEpisode(episodeId, title, episode, thumbnail) {
                         break;
                     }
                 } catch (e) {
-                    console.log(`Source ${source.quality} failed, trying next...`);
+                    // console.log(`Source ${source.quality} failed, trying next...`);
                 }
             }
 
@@ -436,7 +436,7 @@ export function populateQualityMenuHls(levels) {
             elements.qualityMenu.classList.add('hidden');
 
             if (state.hls) {
-                console.log('Setting HLS level to:', levelIndex);
+                // console.log('Setting HLS level to:', levelIndex);
                 state.hls.currentLevel = levelIndex;
             }
         });
@@ -889,7 +889,7 @@ export async function playPrevious() {
 
 
 export function handleVideoEnded() {
-    console.log('Video ended');
+    // console.log('Video ended');
     if (state.isHost) {
         playNext();
     }

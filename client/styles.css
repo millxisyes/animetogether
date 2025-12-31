@@ -445,6 +445,26 @@ button:active {
   padding: 10px 12px;
 }
 
+.icon-btn-small {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: transparent;
+  /* Subtle */
+  border: none;
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.icon-btn-small:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+
 #sidebar-toggle {
   display: flex;
 }
