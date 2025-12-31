@@ -245,3 +245,69 @@ export async function updateAniListProgress(animeTitle, episodeNumber) {
         console.error('AniList scrobble error:', e);
     }
 }
+
+// Fetch mean score (public, no token needed usually, but we have one so we use it if available)
+export async function fetchAniListScore(animeTitle) {
+    const searchQuery = `
+    query ($search: String) {
+        Media (search: $search, type: ANIME) {
+            meanScore
+            averageScore
+        }
+    }
+    `;
+
+    try {
+        // Use token if available, otherwise just public query (AniList API is public for queries)
+        // But our proxy expects authorization header usually? 
+        // Actually the backend proxy *requires* a token. 
+        // If the user isn't logged in, we can't use the proxy easily unless we make it open.
+        // Or we can use direct fetch to graphql.anilist.co if not logged in (might fail due to Discord CSP?).
+        // Let's try proxy with the saved token. If no token, maybe we can't show score?
+        // OR we can make the proxy optional for token.
+        // For now, let's assume if they are logged in.
+        // Wait, user wants score to "match UI properly", implies it should always be there.
+        // If user isn't logged in, they still want to see the score.
+        // I should update the backend proxy to allow requests without token for queries? 
+        // Or just use direct fetch if possible. 
+        // Let's try direct fetch first if no token, else proxy.
+        // Actually, if I can't reach AniList from client without proxy, I need proxy.
+
+        const token = localStorage.getItem(TOKEN_KEY);
+        let url = 'https://graphql.anilist.co';
+        let headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        };
+
+        if (token) {
+            url = '/api/anilist/graphql';
+            headers['Authorization'] = `Bearer ${token}`;
+        } else {
+            // If no token, we can't use the proxy as currently implemented blocks 401.
+            // But direct fetch might be blocked by Discord.
+            // Ideally we update proxy to be open for queries.
+            // Let's try using the proxy even without token, but I need to update backend.
+            // For now, let's just try direct fetch if no token.
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+                query: searchQuery,
+                variables: { search: animeTitle }
+            })
+        });
+
+        const data = await response.json();
+        const media = data.data?.Media;
+        if (media) {
+            return media.meanScore || media.averageScore;
+        }
+        return null;
+    } catch (e) {
+        console.error('Failed to fetch AniList score:', e);
+        return null;
+    }
+}

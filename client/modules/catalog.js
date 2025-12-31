@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { elements } from './ui.js';
 import { proxyImage } from './utils.js';
 import { playEpisode } from './player.js';
+import { fetchAniListScore } from './anilist.js';
 
 export async function searchAnime() {
     const query = elements.searchInput.value.trim();
@@ -227,7 +228,37 @@ export async function loadAnimeDetails(animeId) {
         infoWrapper.className = 'anime-detail-info';
 
         const titleEl = document.createElement('h3');
+        titleEl.style.display = 'flex';
+        titleEl.style.alignItems = 'center';
+        titleEl.style.gap = '10px';
         titleEl.textContent = anime.title || 'Unknown title';
+
+        // Fetch and append score
+        if (anime.title) {
+            fetchAniListScore(anime.title).then(score => {
+                if (score) {
+                    const scoreBadge = document.createElement('span');
+                    scoreBadge.textContent = `${score}%`;
+                    scoreBadge.style.fontSize = '0.8rem';
+                    scoreBadge.style.padding = '2px 8px';
+                    scoreBadge.style.borderRadius = '12px';
+                    scoreBadge.style.fontWeight = 'bold';
+
+                    if (score >= 75) {
+                        scoreBadge.style.backgroundColor = 'rgba(76, 175, 80, 0.2)';
+                        scoreBadge.style.color = '#81c784'; // Green
+                    } else if (score >= 60) {
+                        scoreBadge.style.backgroundColor = 'rgba(255, 152, 0, 0.2)';
+                        scoreBadge.style.color = '#ffb74d'; // Orange
+                    } else {
+                        scoreBadge.style.backgroundColor = 'rgba(244, 67, 54, 0.2)';
+                        scoreBadge.style.color = '#e57373'; // Red
+                    }
+
+                    titleEl.appendChild(scoreBadge);
+                }
+            });
+        }
 
         // Watch Later Button
         const wlBtn = document.createElement('button');
