@@ -3,6 +3,7 @@ const placeholderImage = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/
 
 export function proxyImage(url) {
     if (!url) return placeholderImage;
+    if (url.startsWith('/proxy/image')) return url;
     return `/proxy/image?url=${encodeURIComponent(url)}`;
 }
 

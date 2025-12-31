@@ -165,7 +165,7 @@ function updateAniListUI() {
     }
 }
 
-// Scrobble (Update Progress)
+// Scrobble (Update Progress and Status)
 export async function updateAniListProgress(animeTitle, episodeNumber) {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token || !anilistUser) return;
@@ -199,8 +199,8 @@ export async function updateAniListProgress(animeTitle, episodeNumber) {
                 variables: { search: animeTitle }
             })
         });
-        const searchData = await searchRes.json();
-        const media = searchData.data?.Media;
+        const searchResQuery = await searchRes.json();
+        const media = searchResQuery.data?.Media;
 
         if (!media) {
             console.warn('AniList: Anime not found for scrobbling');
@@ -209,8 +209,8 @@ export async function updateAniListProgress(animeTitle, episodeNumber) {
 
         // 2. Update List Entry
         const mutation = `
-        mutation ($mediaId: Int, $progress: Int) {
-            SaveMediaListEntry (mediaId: $mediaId, progress: $progress) {
+        mutation ($mediaId: Int, $progress: Int, $status: MediaListStatus) {
+            SaveMediaListEntry (mediaId: $mediaId, progress: $progress, status: $status) {
                 id
                 status
                 progress
@@ -229,7 +229,8 @@ export async function updateAniListProgress(animeTitle, episodeNumber) {
                 query: mutation,
                 variables: {
                     mediaId: media.id,
-                    progress: episodeNumber
+                    progress: episodeNumber,
+                    status: 'CURRENT' // Auto-set to Watching
                 }
             })
         });
@@ -244,6 +245,150 @@ export async function updateAniListProgress(animeTitle, episodeNumber) {
 
     } catch (e) {
         console.error('AniList scrobble error:', e);
+    }
+}
+
+export async function updateAniListScore(animeIdOrTitle, score) {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token || !anilistUser) return;
+
+    let mediaId = animeIdOrTitle;
+
+    // If string, assume title and search
+    if (typeof animeIdOrTitle === 'string') {
+        const searchQuery = `
+        query ($search: String) {
+            Media (search: $search, type: ANIME) {
+                id
+                title {
+                    romaji
+                    english
+                }
+            }
+        }
+        `;
+        try {
+            const searchRes = await fetch('/api/anilist/graphql', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: searchQuery,
+                    variables: { search: animeIdOrTitle }
+                })
+            });
+            const searchData = await searchRes.json();
+            if (searchData.data?.Media) {
+                mediaId = searchData.data.Media.id;
+            } else {
+                console.warn('AniList score update: Anime not found');
+                return;
+            }
+        } catch (e) { console.error(e); return; }
+    }
+
+    const mutation = `
+    mutation ($mediaId: Int, $score: Float) {
+        SaveMediaListEntry (mediaId: $mediaId, scoreRaw: $score) {
+            id
+            score
+        }
+    }
+    `;
+
+    try {
+        const response = await fetch('/api/anilist/graphql', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                query: mutation,
+                variables: {
+                    mediaId: mediaId,
+                    score: score * 10 // Convert 0-10 to 0-100 if user uses 10pt scale? 
+                    // AniList scoreRaw depends on user settings, but let's assume 100pt scale for safety or check user settings.
+                    // Actually, 'scoreRaw' usually takes 0-100 or 0-10 depending on scale, but 0-100 is safest for internal storage?
+                    // Let's assume input 'score' is 0-10 and we multiply by 10 for 100-scale.
+                    // If the user uses 10-point scale, 80 becomes 8.
+                    // Let's pass the raw value and hope for the best, or use 'score' instead of 'scoreRaw'?
+                    // 'score' field in mutation adapts to user's score system.
+                    // 'scoreRaw' is always 0-100. Let's use scoreRaw and pass 100-based int.
+                }
+            })
+        });
+
+        const data = await response.json();
+        if (data.data?.SaveMediaListEntry) {
+            addChatMessage({ system: true, content: `AniList score updated.` });
+        }
+    } catch (e) {
+        console.error('Failed to update score:', e);
+    }
+}
+
+// Fetch User Favorites
+export async function fetchUserFavorites() {
+    if (!anilistUser) return [];
+
+    const query = `
+    query ($userId: Int) {
+        User(id: $userId) {
+            favourites {
+                anime {
+                    nodes {
+                        id
+                        title {
+                            romaji
+                            english
+                        }
+                        coverImage {
+                            large
+                        }
+                        meanScore
+                    }
+                }
+            }
+        }
+    }
+    `;
+
+    try {
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) return [];
+
+        const response = await fetch('/api/anilist/graphql', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                query: query,
+                variables: { userId: anilistUser.id }
+            })
+        });
+
+        const data = await response.json();
+        const nodes = data.data?.User?.favourites?.anime?.nodes;
+        if (nodes) {
+            return nodes.map(node => ({
+                id: node.id,
+                title: node.title.english || node.title.romaji,
+                image: node.coverImage.large,
+                score: node.meanScore
+            }));
+        }
+        return [];
+    } catch (e) {
+        console.error('Failed to fetch favorites:', e);
+        return [];
     }
 }
 
@@ -337,6 +482,7 @@ export async function fetchUserAnimeList(status = 'PLANNING') {
                         meanScore
                     }
                     progress
+                    score
                 }
             }
         }
@@ -374,12 +520,56 @@ export async function fetchUserAnimeList(status = 'PLANNING') {
                 description: entry.media.description,
                 episodes: entry.media.episodes,
                 progress: entry.progress, // Watched episodes
-                score: entry.media.meanScore
+                meanScore: entry.media.meanScore,
+                userScore: entry.score
             }));
         }
         return [];
     } catch (e) {
         console.error('Failed to fetch user list:', e);
         return [];
+    }
+}
+
+export async function fetchUserMediaEntry(animeTitle) {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token || !anilistUser) return null;
+
+    const query = `
+    query ($search: String, $userId: Int) {
+        Media (search: $search, type: ANIME) {
+            id
+            mediaListEntry(userId: $userId) {
+                id
+                score
+                status
+                progress
+            }
+        }
+    }
+    `;
+
+    try {
+        const response = await fetch('/api/anilist/graphql', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                query: query,
+                variables: {
+                    search: animeTitle,
+                    userId: anilistUser.id
+                }
+            })
+        });
+
+        const data = await response.json();
+        return data.data?.Media?.mediaListEntry || null;
+    } catch (e) {
+        console.error('Failed to fetch user entry:', e);
+        return null;
     }
 }

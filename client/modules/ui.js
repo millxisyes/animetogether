@@ -6,7 +6,8 @@ import {
     showSearchResults,
     loadWatchHistory,
     loadWatchLater,
-    loadPlanningList
+    loadPlanningList,
+    loadFavoritesList
 } from './catalog.js';
 import {
     togglePlayPause,
@@ -271,6 +272,7 @@ export function setupEventListeners() {
             else if (view === 'history') loadWatchHistory();
             else if (view === 'watch-later') loadWatchLater();
             else if (view === 'planning') loadPlanningList();
+            else if (view === 'favorites') loadFavoritesList();
             else showSearchResults();
         });
     });

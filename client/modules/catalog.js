@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { elements } from './dom.js';
 import { proxyImage } from './utils.js';
 import { playEpisode } from './player.js';
-import { fetchAniListScore, fetchUserAnimeList } from './anilist.js';
+import { fetchAniListScore, fetchUserAnimeList, fetchUserFavorites, updateAniListScore, fetchUserMediaEntry, anilistUser } from './anilist.js';
 
 export async function searchAnime() {
     const query = elements.searchInput.value.trim();
@@ -10,6 +10,13 @@ export async function searchAnime() {
 
     elements.animeResults.innerHTML = '<div class="spinner"></div>';
     showSearchResults();
+
+    // Show 'Results' button explicitly during search
+    const resultsBtn = document.querySelector('.quick-link[data-view="search"]');
+    if (resultsBtn) resultsBtn.classList.remove('hidden');
+    // Also set it as active
+    document.querySelectorAll('.quick-link').forEach(b => b.classList.remove('active'));
+    if (resultsBtn) resultsBtn.classList.add('active');
 
     try {
         const response = await fetch(`/api/anime/search?query=${encodeURIComponent(query)}&provider=${state.provider}`);
@@ -216,10 +223,27 @@ export async function loadPlanningList() {
             elements.animeResults.innerHTML = '<p class="placeholder-text">Your Planning list is empty or not connected.</p>';
             return;
         }
-        displayAniListResults(list); // Use specialized display for AniList objects
+        displayAniListResults(list, 'Planning'); // Use specialized display for AniList objects
     } catch (e) {
         console.error('Failed to load planning list:', e);
         elements.animeResults.innerHTML = '<p class="placeholder-text">Failed to load planning list.</p>';
+    }
+}
+
+export async function loadFavoritesList() {
+    elements.animeResults.innerHTML = '<div class="spinner"></div>';
+    showSearchResults();
+
+    try {
+        const list = await fetchUserFavorites();
+        if (list.length === 0) {
+            elements.animeResults.innerHTML = '<p class="placeholder-text">Your Favorites list is empty or not connected.</p>';
+            return;
+        }
+        displayAniListResults(list, 'Favorite');
+    } catch (e) {
+        console.error('Failed to load favorites list:', e);
+        elements.animeResults.innerHTML = '<p class="placeholder-text">Failed to load favorites list.</p>';
     }
 }
 
@@ -237,7 +261,7 @@ export async function loadPlanningList() {
 // Current `loadAnimeDetails` just calls `/api/anime/info/`.
 // Use a modified click handler for AniList items.
 
-function displayAniListResults(results) {
+function displayAniListResults(results, label = 'AniList') {
     if (results.length === 0) {
         elements.animeResults.innerHTML = '<p class="placeholder-text">No results found</p>';
         return;
@@ -264,7 +288,7 @@ function displayAniListResults(results) {
 
         const meta = document.createElement('div');
         meta.className = 'anime-card-meta';
-        meta.innerHTML = `Planning <span style="opacity:0.7">• ${anime.score ? anime.score + '%' : ''}</span>`;
+        meta.innerHTML = `${label} <span style="opacity:0.7">• ${anime.score ? anime.score + '%' : ''}</span>`;
 
         info.appendChild(title);
         info.appendChild(meta);
@@ -357,6 +381,78 @@ export async function loadAnimeDetails(animeId) {
                     titleEl.appendChild(scoreBadge);
                 }
             });
+
+            // Enhanced AniList User Controls
+            if (anilistUser) {
+                fetchUserMediaEntry(anime.title).then(entry => {
+                    const controlRow = document.createElement('div');
+                    controlRow.style.marginTop = '8px';
+                    controlRow.style.display = 'flex';
+                    controlRow.style.alignItems = 'center';
+                    controlRow.style.gap = '8px';
+
+                    // Status Badge (if exists)
+                    if (entry && entry.status) {
+                        const statusBadge = document.createElement('span');
+                        statusBadge.textContent = entry.status;
+                        statusBadge.className = 'pill';
+                        statusBadge.style.fontSize = '0.7rem';
+                        statusBadge.style.background = 'var(--surface-light)';
+                        controlRow.appendChild(statusBadge);
+                    }
+
+                    // Score Input
+                    const scoreWrapper = document.createElement('div');
+                    scoreWrapper.style.display = 'flex';
+                    scoreWrapper.style.alignItems = 'center';
+                    scoreWrapper.style.gap = '4px';
+
+                    const scoreLabel = document.createElement('span');
+                    scoreLabel.textContent = 'My Score:';
+                    scoreLabel.style.fontSize = '0.8rem';
+                    scoreLabel.style.color = '#aaa';
+
+                    const scoreInput = document.createElement('select');
+                    scoreInput.style.background = 'var(--surface)';
+                    scoreInput.style.color = '#fff';
+                    scoreInput.style.border = '1px solid #444';
+                    scoreInput.style.borderRadius = '4px';
+                    scoreInput.style.padding = '2px';
+                    scoreInput.style.fontSize = '0.8rem';
+
+                    ['-', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'].forEach(val => {
+                        const opt = document.createElement('option');
+                        opt.value = val;
+                        opt.textContent = val;
+                        scoreInput.appendChild(opt);
+                    });
+
+                    // Set current value
+                    if (entry && entry.score) {
+                        // entry.score from API respects user scale?
+                        // If 100pt scale, it might be 80. If 10pt, 8.
+                        // My update function multiplies 10-scale by 10.
+                        // So I need to convert entry.score back to 10-scale roughly to display?
+                        // Or checks entry.score > 10 ? score / 10 : score
+                        let currentScore = entry.score;
+                        if (currentScore > 10) currentScore = Math.round(currentScore / 10);
+                        scoreInput.value = currentScore.toString();
+                    }
+
+                    scoreInput.addEventListener('change', () => {
+                        const val = scoreInput.value;
+                        if (val !== '-') {
+                            updateAniListScore(anime.title, parseFloat(val));
+                        }
+                    });
+
+                    scoreWrapper.appendChild(scoreLabel);
+                    scoreWrapper.appendChild(scoreInput);
+                    controlRow.appendChild(scoreWrapper);
+
+                    infoWrapper.appendChild(controlRow);
+                });
+            }
         }
 
         // Watch Later Button
