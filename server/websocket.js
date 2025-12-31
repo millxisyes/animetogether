@@ -3,6 +3,26 @@ import fs from 'fs';
 const rooms = new Map();
 const DATA_FILE = 'rooms.json';
 
+// === Input validation limits ===
+const MAX_CHANNEL_ID_LENGTH = 64;   // Discord channel IDs are ~19 chars
+const MAX_USER_ID_LENGTH = 64;      // Discord user IDs are ~19 chars  
+const MAX_USERNAME_LENGTH = 100;    // Discord usernames max 32 + some buffer
+const MAX_AVATAR_LENGTH = 256;      // Avatar URL/hash
+const MAX_CHAT_LENGTH = 500;        // Chat message limit
+const MAX_TITLE_LENGTH = 256;       // Video title
+const MAX_URL_LENGTH = 2048;        // URLs
+const MAX_ROOMS = 1000;             // Max total rooms to prevent memory exhaustion
+
+// === Rate limiting ===
+const rateLimits = new Map();       // IP -> { joins: count, messages: 0, lastReset: timestamp }
+const RATE_LIMIT_WINDOW = 60000;    // 1 minute window
+const MAX_JOINS_PER_WINDOW = 10;    // Max join attempts per minute per IP
+const MAX_MESSAGES_PER_WINDOW = 30; // Max chat messages per minute
+
+// === IP Blocklist for spammers ===
+const blockedIPs = new Map();       // IP -> unblockTime timestamp
+const BLOCK_DURATION = 10 * 60 * 1000; // 10 minute ban for spammers
+
 function saveRooms() {
   try {
     const serializable = Array.from(rooms.entries()).map(([id, room]) => ({
@@ -44,16 +64,40 @@ export function setupWebSocket(wss) {
   console.log('WebSocket server initialized');
 
   wss.on('connection', (ws, req) => {
-    console.log('New WebSocket connection from:', req.socket.remoteAddress);
+    // Get real client IP (Cloudflare provides CF-Connecting-IP header)
+    const clientIp = req.headers['cf-connecting-ip']
+      || req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+      || req.socket.remoteAddress
+      || 'unknown';
+
+    // === Check if IP is blocked (silently close connection) ===
+    const unblockTime = blockedIPs.get(clientIp);
+    if (unblockTime) {
+      if (Date.now() < unblockTime) {
+        // Still blocked - close silently without logging
+        ws.close();
+        return;
+      } else {
+        // Block expired, remove from blocklist
+        blockedIPs.delete(clientIp);
+      }
+    }
+
+    console.log('New WebSocket connection from:', clientIp);
 
     let currentRoom = null;
     let odUserId = null;
     let isHost = false;
 
     ws.on('message', (data) => {
+      // Check if blocked before processing any message
+      if (blockedIPs.has(clientIp) && Date.now() < blockedIPs.get(clientIp)) {
+        ws.close();
+        return;
+      }
+
       try {
         const message = JSON.parse(data.toString());
-        console.log('Received message:', message.type, message);
         handleMessage(ws, message);
       } catch (error) {
         console.error('WebSocket message error:', error);
@@ -91,16 +135,67 @@ export function setupWebSocket(wss) {
 
     function handleJoin(ws, message) {
       const { channelId, odUserId: odUserIdFromMsg, username, avatar } = message;
-      odUserId = odUserIdFromMsg;
-      currentRoom = channelId;
 
-      console.log(`User ${odUserId} (${username}) joining channel ${channelId}`);
-      console.log(`Current rooms:`, Array.from(rooms.keys()));
+      // === Input validation ===
+      if (!channelId || typeof channelId !== 'string' || channelId.length > MAX_CHANNEL_ID_LENGTH) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid channel ID' }));
+        return;
+      }
+      if (!odUserIdFromMsg || typeof odUserIdFromMsg !== 'string' || odUserIdFromMsg.length > MAX_USER_ID_LENGTH) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid user ID' }));
+        return;
+      }
+      if (username && (typeof username !== 'string' || username.length > MAX_USERNAME_LENGTH)) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid username' }));
+        return;
+      }
+      if (avatar && (typeof avatar !== 'string' || avatar.length > MAX_AVATAR_LENGTH)) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid avatar' }));
+        return;
+      }
+
+      // === Rate limiting ===
+      const clientIp = req.socket.remoteAddress || 'unknown';
+      const now = Date.now();
+      let rateData = rateLimits.get(clientIp);
+
+      if (!rateData || now - rateData.lastReset > RATE_LIMIT_WINDOW) {
+        rateData = { joins: 0, messages: 0, lastReset: now };
+        rateLimits.set(clientIp, rateData);
+      }
+
+      rateData.joins++;
+      if (rateData.joins > MAX_JOINS_PER_WINDOW) {
+        // Block this IP for 10 minutes
+        blockedIPs.set(clientIp, Date.now() + BLOCK_DURATION);
+        console.warn(`IP ${clientIp} blocked for 10 minutes (exceeded join rate limit)`);
+        ws.close();
+        return;
+      }
+
+      // === Max rooms check ===
+      if (!rooms.has(channelId) && rooms.size >= MAX_ROOMS) {
+        console.warn(`Max rooms limit reached (${MAX_ROOMS}), rejecting new room creation`);
+        ws.send(JSON.stringify({ type: 'error', message: 'Server at capacity. Please try again later.' }));
+        return;
+      }
+
+      // Sanitize inputs (truncate just in case)
+      const safeChannelId = channelId.slice(0, MAX_CHANNEL_ID_LENGTH);
+      const safeUserId = odUserIdFromMsg.slice(0, MAX_USER_ID_LENGTH);
+      const safeUsername = (username || 'Anonymous').slice(0, MAX_USERNAME_LENGTH);
+      const safeAvatar = (avatar || '').slice(0, MAX_AVATAR_LENGTH);
+
+      odUserId = safeUserId;
+      currentRoom = safeChannelId;
+
+      console.log(`User ${odUserId} (${safeUsername}) joining channel ${safeChannelId}`);
+      console.log(`Current rooms: ${rooms.size}`);
 
       // Get or create room
-      if (!rooms.has(channelId)) {
+      if (!rooms.has(safeChannelId)) {
         // First person to join becomes the host
-        rooms.set(channelId, {
+        rooms.set(safeChannelId, {
           hostId: odUserId,
           hostWs: ws,
           viewers: new Map(),
@@ -112,30 +207,30 @@ export function setupWebSocket(wss) {
           },
         });
         isHost = true;
-        console.log(`✅ Room CREATED for channel ${channelId}, host: ${odUserId} (${username})`);
+        console.log(`✅ Room CREATED for channel ${safeChannelId}, host: ${odUserId} (${safeUsername})`);
       } else {
-        const room = rooms.get(channelId);
+        const room = rooms.get(safeChannelId);
         // Clean up stale connections on restart
         if (room.hostId === odUserId && (!room.hostWs || room.hostWs.readyState !== 1)) {
           room.hostWs = ws;
           isHost = true;
-          console.log(`Host ${odUserId} reconnected to channel ${channelId}`);
+          console.log(`Host ${odUserId} reconnected to channel ${safeChannelId}`);
         } else if (room.hostId === odUserId) {
           // Host reconnected - update socket reference
           room.hostWs = ws;
           isHost = true;
-          console.log(`Host ${odUserId} reconnected to channel ${channelId}`);
+          console.log(`Host ${odUserId} reconnected to channel ${safeChannelId}`);
         } else {
           // Join as viewer
-          room.viewers.set(odUserId, { ws, username, avatar });
+          room.viewers.set(odUserId, { ws, username: safeUsername, avatar: safeAvatar });
           isHost = false;
-          console.log(`User ${odUserId} joined channel ${channelId} as viewer`);
+          console.log(`User ${odUserId} joined channel ${safeChannelId} as viewer`);
         }
       }
 
       saveRooms();
 
-      const room = rooms.get(channelId);
+      const room = rooms.get(safeChannelId);
 
       console.log(`Sending role to ${odUserId}: isHost=${isHost}`);
 
@@ -157,10 +252,10 @@ export function setupWebSocket(wss) {
       }));
 
       // Notify others about new viewer
-      broadcastToRoom(channelId, {
+      broadcastToRoom(safeChannelId, {
         type: 'viewer-joined',
         odUserId,
-        username,
+        username: safeUsername,
         viewerCount: room.viewers.size + 1,
       }, ws);
     }
@@ -251,11 +346,42 @@ export function setupWebSocket(wss) {
     function handleChat(ws, message) {
       if (!currentRoom) return;
 
+      // === Input validation ===
+      const content = message.content;
+      if (!content || typeof content !== 'string' || content.length > MAX_CHAT_LENGTH) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Message too long (max 500 characters)' }));
+        return;
+      }
+      if (content.trim().length === 0) return; // Ignore empty messages
+
+      // === Rate limiting for chat ===
+      const clientIp = req.socket.remoteAddress || 'unknown';
+      const now = Date.now();
+      let rateData = rateLimits.get(clientIp);
+
+      if (!rateData || now - rateData.lastReset > RATE_LIMIT_WINDOW) {
+        rateData = { joins: 0, messages: 0, lastReset: now };
+        rateLimits.set(clientIp, rateData);
+      }
+
+      rateData.messages++;
+      if (rateData.messages > MAX_MESSAGES_PER_WINDOW) {
+        // Block this IP for 10 minutes
+        blockedIPs.set(clientIp, Date.now() + BLOCK_DURATION);
+        console.warn(`IP ${clientIp} blocked for 10 minutes (exceeded chat rate limit)`);
+        ws.close();
+        return;
+      }
+
+      // Sanitize
+      const safeContent = content.slice(0, MAX_CHAT_LENGTH).trim();
+      const safeUsername = (message.username || 'Anonymous').slice(0, MAX_USERNAME_LENGTH);
+
       broadcastToRoom(currentRoom, {
         type: 'chat',
         odUserId,
-        username: message.username,
-        content: message.content,
+        username: safeUsername,
+        content: safeContent,
         timestamp: Date.now(),
       });
     }
@@ -329,83 +455,4 @@ function broadcastToRoom(channelId, message, excludeWs = null) {
   }
 }
 
-// Export functions for admin panel
-export function getRoomsInfo() {
-  const roomsInfo = [];
-  for (const [channelId, room] of rooms.entries()) {
-    const viewers = Array.from(room.viewers.entries()).map(([userId, viewer]) => ({
-      userId,
-      username: viewer.username,
-      avatar: viewer.avatar,
-    }));
 
-    roomsInfo.push({
-      channelId,
-      hostId: room.hostId,
-      viewers,
-      currentVideo: room.currentVideo,
-      playbackState: room.playbackState,
-      totalUsers: viewers.length + 1,
-    });
-  }
-  return roomsInfo;
-}
-
-export function forceChangeHost(channelId, newHostId) {
-  const room = rooms.get(channelId);
-  if (!room) {
-    return { success: false, error: 'Room not found' };
-  }
-
-  // Check if new host is in the room
-  const isNewHostCurrentHost = room.hostId === newHostId;
-  const isNewHostViewer = room.viewers.has(newHostId);
-
-  if (!isNewHostCurrentHost && !isNewHostViewer) {
-    return { success: false, error: 'User not in room' };
-  }
-
-  const oldHostId = room.hostId;
-
-  if (newHostId === oldHostId) {
-    return { success: false, error: 'User is already host' };
-  }
-
-  // Move old host to viewers
-  if (room.hostWs && room.hostWs.readyState === 1) {
-    room.hostWs.send(JSON.stringify({
-      type: 'role',
-      isHost: false,
-      hostId: newHostId,
-      currentVideo: room.currentVideo,
-      playbackState: room.playbackState,
-      viewerCount: room.viewers.size + 1,
-    }));
-  }
-  room.viewers.set(oldHostId, {
-    ws: room.hostWs,
-    username: 'User ' + oldHostId.substring(0, 8),
-    avatar: '',
-  });
-
-  // Move new host from viewers to host
-  const newHostData = room.viewers.get(newHostId);
-  if (newHostData) {
-    room.viewers.delete(newHostId);
-    room.hostWs = newHostData.ws;
-  }
-
-  room.hostId = newHostId;
-
-  // Notify all users about host change
-  broadcastToRoom(channelId, {
-    type: 'host-changed',
-    newHostId,
-    viewerCount: room.viewers.size + 1,
-  });
-
-  console.log(`Host changed in room ${channelId}: ${oldHostId} → ${newHostId}`);
-  saveRooms();
-
-  return { success: true, oldHostId, newHostId };
-}

@@ -10,7 +10,7 @@ import { setupWebSocket } from './websocket.js';
 import apiRoutes from './routes/api.js';
 import proxyRoutes from './routes/proxy.js';
 import subtitlesRoutes from './routes/subtitles.js';
-import adminRoutes from './routes/admin.js';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -53,17 +53,12 @@ app.use(express.static(join(__dirname, '../client'), {
 }));
 app.use('/dist', express.static(join(__dirname, '../client/dist')));
 
-// Admin panel at /admin67
-app.get('/admin67', (req, res) => {
-  const adminPath = join(__dirname, '../client/admin.html');
-  res.sendFile(adminPath);
-});
+
 
 // API routes for anime browsing (proxied to Consumet)
 app.use('/api', apiRoutes);
 
-// Admin API routes
-app.use('/', adminRoutes);
+
 
 // Subtitles search/download helper
 app.use('/api/subtitles', subtitlesRoutes);
