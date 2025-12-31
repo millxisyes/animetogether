@@ -133,7 +133,20 @@
                 <div id="video-loading-overlay" class="video-loading-overlay hidden">
                   <div class="video-loading-content">
                     <div id="video-loading-spinner" class="spinner-small"></div>
-                    <p id="video-loading-text">Loading episode...</p>
+                    <span class="video-loading-text" id="video-loading-text">Loading...</span>
+                  </div>
+                </div>
+
+                <!-- Up Next Overlay -->
+                <div id="up-next-overlay" class="up-next-overlay hidden">
+                  <div class="up-next-content">
+                    <div class="up-next-label">UP NEXT</div>
+                    <div class="up-next-title" id="up-next-title">Episode ?</div>
+                    <div class="up-next-timer">Auto-playing in <span id="up-next-timer-val">10</span>s</div>
+                    <div class="up-next-actions">
+                      <button id="up-next-cancel-btn" class="ghost-btn">Cancel</button>
+                      <button id="up-next-play-btn" class="primary-btn">Play Now</button>
+                    </div>
                   </div>
                 </div>
 

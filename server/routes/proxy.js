@@ -86,8 +86,14 @@ router.get('/hls', async (req, res) => {
       res.send(Buffer.from(buffer));
     }
   } catch (error) {
+    if (isSilentError(error)) {
+      // Client disconnected, ignore
+      return res.end();
+    }
     console.error('Proxy error:', error);
-    res.status(500).json({ error: 'Proxy failed' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Proxy failed' });
+    }
   }
 });
 
@@ -130,8 +136,13 @@ router.get('/video', async (req, res) => {
     const buffer = await response.arrayBuffer();
     res.send(Buffer.from(buffer));
   } catch (error) {
+    if (isSilentError(error)) {
+      return res.end();
+    }
     console.error('Video proxy error:', error);
-    res.status(500).json({ error: 'Video proxy failed' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Video proxy failed' });
+    }
   }
 });
 
@@ -175,8 +186,13 @@ router.get('/image', async (req, res) => {
     const buffer = await response.arrayBuffer();
     res.send(Buffer.from(buffer));
   } catch (error) {
+    if (isSilentError(error)) {
+      return res.end();
+    }
     console.error('Image proxy error:', error);
-    res.status(500).json({ error: 'Image proxy failed' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Image proxy failed' });
+    }
   }
 });
 
@@ -236,10 +252,22 @@ router.get('/subtitle', async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.send(content);
   } catch (error) {
+    if (isSilentError(error)) {
+      return res.end();
+    }
     console.error('Subtitle proxy error:', error);
-    res.status(500).json({ error: 'Subtitle proxy failed' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Subtitle proxy failed' });
+    }
   }
 });
+
+function isSilentError(error) {
+  if (error.code === 'ECONNRESET' || error.code === 'EPIPE') return true;
+  if (error.cause && (error.cause.code === 'ECONNRESET' || error.cause.code === 'EPIPE')) return true;
+  if (error.message && (error.message.includes('terminated') || error.message.includes('aborted'))) return true;
+  return false;
+}
 
 // Convert SRT format to VTT
 function convertSrtToVtt(srt) {

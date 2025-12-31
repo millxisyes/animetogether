@@ -238,6 +238,12 @@ export function loadVideo(video, playbackState) {
         console.error('loadVideo called with invalid video data:', video);
         return;
     }
+
+    // Reset Up Next state on new video
+    upNextShown = false;
+    autoNextCancelled = false;
+    hideUpNextOverlay();
+
     state.currentVideo = video;
 
     elements.emptyState.classList.add('hidden');
@@ -569,6 +575,9 @@ export function updateProgress() {
 
     // Check for AniList scrobble (90%)
     checkAniListProgress(video);
+
+    // Check for Up Next Overlay
+    checkUpNext(video);
 }
 
 // Throttle AniList updates to avoid spam
@@ -583,6 +592,63 @@ function checkAniListProgress(video) {
         anilistUpdatedEpisode = state.currentVideo.episodeId;
         updateAniListProgress(state.currentVideo.title, state.currentVideo.episode);
     }
+}
+
+let upNextShown = false;
+let autoNextCancelled = false;
+let countdownInterval = null;
+
+export function checkUpNext(video) {
+    if (!state.isHost) return;
+    if (!state.episodeList || state.episodeList.length === 0) return;
+    if (!video.duration) return;
+
+    const timeRemaining = video.duration - video.currentTime;
+
+    // Show overlay if < 15s remaining, haven't shown yet, and next episode exists
+    if (timeRemaining <= 15 && timeRemaining > 0 && !upNextShown && !autoNextCancelled) {
+        // Check if next episode exists
+        const currentIndex = state.episodeList.findIndex(e => e.id === state.currentVideo.episodeId);
+        if (currentIndex !== -1 && currentIndex < state.episodeList.length - 1) {
+            const nextEpisode = state.episodeList[currentIndex + 1];
+            showUpNextOverlay(nextEpisode);
+        }
+    } else if (timeRemaining > 20) {
+        // Reset if user seeks back safely
+        if (upNextShown) hideUpNextOverlay();
+        upNextShown = false;
+        autoNextCancelled = false;
+    }
+}
+
+export function showUpNextOverlay(nextEpisode) {
+    upNextShown = true;
+    elements.upNextOverlay.classList.remove('hidden');
+    elements.upNextTitle.textContent = `Episode ${nextEpisode.number}`;
+
+    let secondsLeft = 10;
+    elements.upNextTimerVal.textContent = secondsLeft;
+
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+        secondsLeft--;
+        elements.upNextTimerVal.textContent = secondsLeft;
+        if (secondsLeft <= 0) {
+            clearInterval(countdownInterval);
+            playNext();
+        }
+    }, 1000);
+}
+
+export function hideUpNextOverlay() {
+    elements.upNextOverlay.classList.add('hidden');
+    if (countdownInterval) clearInterval(countdownInterval);
+}
+
+export function cancelUpNext() {
+    autoNextCancelled = true;
+    hideUpNextOverlay();
+    addChatMessage({ system: true, content: 'Auto-play cancelled' });
 }
 
 export function updateTimeDisplay() {
@@ -763,37 +829,5 @@ export async function playPrevious() {
     await playEpisode(prevEp.id, state.currentVideo.title, prevEp.number, state.currentVideo.thumbnail);
 }
 
-async function handleVideoEnded() {
-    if (!state.isHost) return;
-    console.log('Video ended. checking for next episode...');
 
-    if (!state.episodeList || state.episodeList.length === 0) {
-        console.log('No episode list available for auto-next');
-        return;
-    }
-
-    const currentEpisodeId = state.currentVideo.episodeId;
-    const currentIndex = state.episodeList.findIndex(e => e.id === currentEpisodeId);
-
-    if (currentIndex !== -1 && currentIndex < state.episodeList.length - 1) {
-        const nextEpisode = state.episodeList[currentIndex + 1];
-        console.log('Auto-playing next episode:', nextEpisode.number);
-
-        addChatMessage({ system: true, content: `Episode finished. Auto-playing Episode ${nextEpisode.number} in 3s...` });
-
-        setTimeout(() => {
-            playEpisode(
-                nextEpisode.id,
-                state.currentVideo.title, // Assume title is same
-                nextEpisode.number,
-                null // Thumbnail might be tricky, maybe currentVideo's or let playEpisode handle it?
-                // Actually playEpisode takes thumbnail. We can use proxyImage(nextEpisode.image) if available, or just null.
-                // Looking at catalog.js, episode items have thumbnails. The state.episodeList usually just has ID, title, number, url?
-                // Consumet episodes usually don't have individual images in the list unless detailed.
-            ).catch(console.error);
-        }, 3000);
-    } else {
-        console.log('No next episode found or last episode reached.');
-    }
-}
 

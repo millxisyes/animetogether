@@ -67,4 +67,10 @@ export const elements = {
     anilistAuthStep: document.getElementById('anilist-auth-step'),
     anilistTokenInput: document.getElementById('anilist-token-input'),
     anilistVerifyBtn: document.getElementById('anilist-verify-btn'),
+    // Up Next Overlay
+    upNextOverlay: document.getElementById('up-next-overlay'),
+    upNextTitle: document.getElementById('up-next-title'),
+    upNextTimerVal: document.getElementById('up-next-timer-val'),
+    upNextPlayBtn: document.getElementById('up-next-play-btn'),
+    upNextCancelBtn: document.getElementById('up-next-cancel-btn'),
 };

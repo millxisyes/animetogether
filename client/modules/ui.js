@@ -18,7 +18,8 @@ import {
     skipIntro,
     setPlaybackRate,
     playNext,
-    playPrevious
+    playPrevious,
+    cancelUpNext
 } from './player.js';
 import { sendWsMessage } from './socket.js';
 import { captionSettings } from './captionSettings.js';
@@ -467,6 +468,9 @@ export function setupEventListeners() {
 
     if (elements.nextBtn) elements.nextBtn.addEventListener('click', playNext);
     if (elements.prevBtn) elements.prevBtn.addEventListener('click', playPrevious);
+
+    if (elements.upNextPlayBtn) elements.upNextPlayBtn.addEventListener('click', playNext);
+    if (elements.upNextCancelBtn) elements.upNextCancelBtn.addEventListener('click', cancelUpNext);
 
     document.querySelectorAll('#speed-menu .caption-option').forEach(btn => {
         btn.addEventListener('click', () => {
