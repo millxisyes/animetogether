@@ -1,8 +1,8 @@
 import { state } from './state.js';
-import { elements } from './ui.js';
+import { elements } from './dom.js';
 import { proxyImage } from './utils.js';
 import { playEpisode } from './player.js';
-import { fetchAniListScore } from './anilist.js';
+import { fetchAniListScore, fetchUserAnimeList } from './anilist.js';
 
 export async function searchAnime() {
     const query = elements.searchInput.value.trim();
@@ -204,6 +204,105 @@ export function loadWatchLater() {
     }
 
     displayAnimeResults(list);
+}
+
+export async function loadPlanningList() {
+    elements.animeResults.innerHTML = '<div class="spinner"></div>';
+    showSearchResults();
+
+    try {
+        const list = await fetchUserAnimeList('PLANNING');
+        if (list.length === 0) {
+            elements.animeResults.innerHTML = '<p class="placeholder-text">Your Planning list is empty or not connected.</p>';
+            return;
+        }
+        displayAniListResults(list); // Use specialized display for AniList objects
+    } catch (e) {
+        console.error('Failed to load planning list:', e);
+        elements.animeResults.innerHTML = '<p class="placeholder-text">Failed to load planning list.</p>';
+    }
+}
+
+// Specialized display for AniList objects (which have slightly different structure or might need Consumet mapping)
+// Actually, fetchUserAnimeList maps it to a standard structure we can use.
+// But wait, displayAnimeResults expects Consumet structure?
+// Consumet: { id, title, image, releaseDate, subOrDub }
+// AniList Mapped: { id, title, image, banner, description, episodes, progress, score }
+// The IDs from AniList might NOT match Consumet IDs (GogoAnime usually).
+// If we click an item from AniList list, `loadAnimeDetails` will look up by ID.
+// If the ID is an AniList ID, `loadAnimeDetails` (which calls `/api/anime/info/:id`) might fail if the provider expects a GogoAnime ID.
+// The backend `/api/anime/info/:id` usually expects a GogoAnime ID.
+// So when clicking a "Planning" item, we might need to SEARCH for the anime by title first to get the Gogo ID.
+// Or we can rely on `loadAnimeDetails` to handle it? 
+// Current `loadAnimeDetails` just calls `/api/anime/info/`.
+// Use a modified click handler for AniList items.
+
+function displayAniListResults(results) {
+    if (results.length === 0) {
+        elements.animeResults.innerHTML = '<p class="placeholder-text">No results found</p>';
+        return;
+    }
+
+    elements.animeResults.innerHTML = '';
+
+    results.forEach(anime => {
+        const card = document.createElement('div');
+        card.className = 'anime-card';
+        card.dataset.id = anime.id;
+
+        const img = document.createElement('img');
+        img.src = proxyImage(anime.image);
+        img.alt = anime.title;
+        img.onerror = () => { img.src = ''; img.onerror = null; };
+
+        const info = document.createElement('div');
+        info.className = 'anime-card-info';
+
+        const title = document.createElement('div');
+        title.className = 'anime-card-title';
+        title.textContent = anime.title;
+
+        const meta = document.createElement('div');
+        meta.className = 'anime-card-meta';
+        meta.innerHTML = `Planning <span style="opacity:0.7">• ${anime.score ? anime.score + '%' : ''}</span>`;
+
+        info.appendChild(title);
+        info.appendChild(meta);
+        card.appendChild(img);
+        card.appendChild(info);
+
+        card.addEventListener('click', () => {
+            // For AniList items, we must SEARCH by title to find the streamable version
+            // as we don't have the GogoAnime ID.
+            searchAndLoadAnime(anime.title);
+        });
+        elements.animeResults.appendChild(card);
+    });
+}
+
+async function searchAndLoadAnime(query) {
+    elements.animeResults.classList.add('hidden');
+    elements.animeDetails.classList.remove('hidden');
+    elements.animeInfo.innerHTML = '<div class="spinner"></div>';
+    elements.episodeList.innerHTML = '';
+
+    try {
+        // Auto-search logic
+        const response = await fetch(`/api/anime/search?query=${encodeURIComponent(query)}&provider=${state.provider}`);
+        const data = await response.json();
+        if (data.results && data.results.length > 0) {
+            // Pick the first result? Or show a mini-selector?
+            // Taking first result is risky but acceptable for "Instant Play".
+            // Better: Let's show the details of the first result.
+            const firstMatch = data.results[0];
+            loadAnimeDetails(firstMatch.id);
+        } else {
+            elements.animeInfo.innerHTML = '<p class="placeholder-text">Anime not found on provider.</p>';
+        }
+    } catch (e) {
+        console.error('Auto-search failed:', e);
+        elements.animeInfo.innerHTML = '<p class="placeholder-text">Failed to find anime.</p>';
+    }
 }
 
 export async function loadAnimeDetails(animeId) {

@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { elements } from './ui.js';
+import { elements } from './dom.js';
 import { sendWsMessage } from './socket.js';
 
 export function setupSettingsListeners() {

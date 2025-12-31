@@ -1,4 +1,5 @@
-import { elements, addChatMessage } from './ui.js';
+import { addChatMessage } from './ui.js';
+import { elements } from './dom.js';
 import { discordSdk } from './auth.js';
 
 // Persist token in localStorage
@@ -309,5 +310,76 @@ export async function fetchAniListScore(animeTitle) {
     } catch (e) {
         console.error('Failed to fetch AniList score:', e);
         return null;
+    }
+}
+
+// Fetch user list (e.g. Planning)
+export async function fetchUserAnimeList(status = 'PLANNING') {
+    if (!anilistUser) return [];
+
+    const query = `
+    query ($userId: Int, $status: MediaListStatus) {
+        MediaListCollection(userId: $userId, type: ANIME, status: $status, sort: UPDATED_TIME_DESC) {
+            lists {
+                entries {
+                    media {
+                        id
+                        title {
+                            romaji
+                            english
+                        }
+                        coverImage {
+                            large
+                        }
+                        episodes
+                        bannerImage
+                        description
+                        meanScore
+                    }
+                    progress
+                }
+            }
+        }
+    }
+    `;
+
+    try {
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) return [];
+
+        const response = await fetch('/api/anilist/graphql', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                query: query,
+                variables: {
+                    userId: anilistUser.id,
+                    status: status
+                }
+            })
+        });
+
+        const data = await response.json();
+        const lists = data.data?.MediaListCollection?.lists;
+        if (lists && lists.length > 0) {
+            return lists[0].entries.map(entry => ({
+                id: entry.media.id,
+                title: entry.media.title.english || entry.media.title.romaji,
+                image: entry.media.coverImage.large,
+                banner: entry.media.bannerImage,
+                description: entry.media.description,
+                episodes: entry.media.episodes,
+                progress: entry.progress, // Watched episodes
+                score: entry.media.meanScore
+            }));
+        }
+        return [];
+    } catch (e) {
+        console.error('Failed to fetch user list:', e);
+        return [];
     }
 }

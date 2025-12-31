@@ -1,5 +1,5 @@
 
-import { elements } from './ui.js';
+import { elements } from './dom.js';
 
 // Default settings
 const DEFAULT_SETTINGS = {

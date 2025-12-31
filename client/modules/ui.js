@@ -5,7 +5,8 @@ import {
     loadTopAiring,
     showSearchResults,
     loadWatchHistory,
-    loadWatchLater
+    loadWatchLater,
+    loadPlanningList
 } from './catalog.js';
 import {
     togglePlayPause,
@@ -24,69 +25,11 @@ import { setupSettingsListeners, toggleSettingsButton } from './settings.js';
 import { initAniList } from './anilist.js';
 
 // DOM Elements
-export const elements = {
-    loadingScreen: document.getElementById('loading-screen'),
-    mainScreen: document.getElementById('main-screen'),
-    roleBadge: document.getElementById('role-badge'),
-    viewerCount: document.getElementById('viewer-count-num'),
-    sidebar: document.getElementById('sidebar'),
-    sidebarToggle: document.getElementById('sidebar-toggle'),
-    floatingToolbar: document.getElementById('floating-toolbar'),
-    fullscreenToggle: document.getElementById('fullscreen-toggle'),
-    searchInput: document.getElementById('search-input'),
-    searchBtn: document.getElementById('search-btn'),
-    animeResults: document.getElementById('anime-results'),
-    animeDetails: document.getElementById('anime-details'),
-    animeInfo: document.getElementById('anime-info'),
-    episodeList: document.getElementById('episode-list'),
-    backToResults: document.getElementById('back-to-results'),
-    emptyState: document.getElementById('empty-state'),
-    emptyMessage: document.getElementById('empty-message'),
-    videoWrapper: document.getElementById('video-wrapper'),
-    videoPlayer: document.getElementById('video-player'),
-    playPauseBtn: document.getElementById('play-pause-btn'),
-    progressBar: document.getElementById('progress-bar'),
-    progressFill: document.getElementById('progress-fill'),
-    progressBuffer: document.getElementById('progress-buffer'),
-    timeDisplay: document.getElementById('time-display'),
-    nowPlaying: document.getElementById('now-playing'),
-    syncIndicator: document.getElementById('sync-indicator'),
-    videoLoadingOverlay: document.getElementById('video-loading-overlay'),
-    videoLoadingText: document.getElementById('video-loading-text'),
-    videoLoadingSpinner: document.getElementById('video-loading-spinner'),
-    streamErrorAlert: document.getElementById('stream-error-alert'),
-    streamErrorMessage: document.getElementById('stream-error-message'),
-    errorDismissBtn: document.getElementById('error-dismiss-btn'),
-    muteBtn: document.getElementById('mute-btn'),
-    volumeSlider: document.getElementById('volume-slider'),
-    chatMessages: document.getElementById('chat-messages'),
-    chatInput: document.getElementById('chat-input'),
-    chatSend: document.getElementById('chat-send'),
-    captionBtn: document.getElementById('caption-btn'),
-    captionMenu: document.getElementById('caption-menu'),
-    captionOptions: document.getElementById('caption-options'),
-    dubToggle: document.getElementById('dub-toggle'),
-    dubLabel: document.getElementById('dub-label'),
-    skipIntroBtn: document.getElementById('skip-intro-btn'),
-    hianimeWarning: document.getElementById('hianime-warning'),
-    speedBtn: document.getElementById('speed-btn'),
-    speedMenu: document.getElementById('speed-menu'),
-    nextBtn: document.getElementById('next-btn'),
-    prevBtn: document.getElementById('prev-btn'),
-    qualityBtn: document.getElementById('quality-btn'),
-    qualityMenu: document.getElementById('quality-menu'),
-    qualityOptions: document.getElementById('quality-options'),
-    errorRetryBtn: document.getElementById('error-retry-btn'),
-    // Room Settings
-    roomSettingsBtn: document.getElementById('room-settings-btn'),
-    roomSettingsModal: document.getElementById('room-settings-modal'),
-    closeRoomSettings: document.getElementById('close-room-settings'),
-    settingFreeMode: document.getElementById('setting-freemode'),
-    // User Profile
-    profileBtn: document.getElementById('profile-btn'),
-    profileModal: document.getElementById('profile-modal'),
-    closeProfileModal: document.getElementById('close-profile-modal'),
-};
+import { elements } from './dom.js';
+
+// Re-export elements for compatibility (though we'll update other files too)
+export { elements };
+
 
 export function showMainScreen() {
     elements.loadingScreen.classList.remove('active');
@@ -325,7 +268,9 @@ export function setupEventListeners() {
             if (view === 'recent') loadRecentEpisodes();
             else if (view === 'top') loadTopAiring();
             else if (view === 'history') loadWatchHistory();
+            else if (view === 'history') loadWatchHistory();
             else if (view === 'watch-later') loadWatchLater();
+            else if (view === 'planning') loadPlanningList();
             else showSearchResults();
         });
     });

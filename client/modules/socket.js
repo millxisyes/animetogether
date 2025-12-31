@@ -1,5 +1,6 @@
 import { state } from './state.js';
-import { elements, addChatMessage, updateRoleUI } from './ui.js';
+import { addChatMessage, updateRoleUI } from './ui.js';
+import { elements } from './dom.js';
 import {
     handleSync,
     handleRemotePlay,

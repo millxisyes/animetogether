@@ -1,6 +1,7 @@
 import { DiscordSDK } from '@discord/embedded-app-sdk';
 import { state } from './state.js';
-import { elements, showMainScreen, setupEventListeners, showStreamError, handleResize } from './ui.js';
+import { showMainScreen, setupEventListeners, showStreamError, handleResize } from './ui.js';
+import { elements } from './dom.js';
 import { connectWebSocket } from './socket.js';
 import { loadTopAiring } from './catalog.js';
 import { checkFeatureFlagCustomId } from './flags.js';

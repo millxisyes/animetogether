@@ -1,6 +1,7 @@
 import Hls from 'hls.js';
 import { state } from './state.js';
-import { elements, showStreamError, addChatMessage } from './ui.js';
+import { showStreamError, addChatMessage } from './ui.js';
+import { elements } from './dom.js';
 import { formatTime } from './utils.js';
 import { sendWsMessage } from './socket.js';
 import { updateDiscordActivity } from './auth.js';
